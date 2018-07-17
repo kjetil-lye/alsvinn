@@ -3,12 +3,12 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -18,6 +18,7 @@
 #include "alsuq/types.hpp"
 #include <boost/property_tree/ptree.hpp>
 #include "alsuq/mpi/Configuration.hpp"
+#include "alsfvm/mpi/CellExchanger.hpp"
 namespace alsuq {
 namespace stats {
 
@@ -33,6 +34,10 @@ public:
 
     void setPlatform(const std::string& platform);
     std::string getPlatform() const;
+
+    alsfvm::mpi::CellExchangerPtr getCellExhanger() const;
+
+    void setCellExchanger(alsfvm::mpi::CellExchangerPtr cellExchanger) const;
 private:
 
     size_t samples =  0;
@@ -40,6 +45,7 @@ private:
     mpi::ConfigurationPtr mpiConfiguration = nullptr;
 
     std::string platform = "cpu";
-};
+
+    alsfvm::mpi::CellExchangerPtr cellExchanger = nullptr;
 } // namespace stats
 } // namespace alsuq

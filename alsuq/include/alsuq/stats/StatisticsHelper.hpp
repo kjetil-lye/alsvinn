@@ -3,12 +3,12 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -68,6 +68,15 @@ protected:
         const alsfvm::volume::Volume& conservedVariables,
         const alsfvm::volume::Volume& extraVariables,
         size_t nx, size_t ny, size_t nz, const std::string& platform = "default");
+
+    //! Gets the data on the border, if any.
+    //!
+    //! @note returns an empty volume if the border is not present (ie. if this node is at the end)
+    //!
+    //! @note This is not the most efficient way of doing this,
+    //!       but since we anyway don't expect the statistics to be called too often,
+    //!       it should be ok.
+    alsfvm::volume::VolumePair getBorder(ivec3 sideIdentifcation, int ghostSize);
 private:
     size_t samples;
 
