@@ -14,35 +14,19 @@
  */
 
 #pragma once
-#include "alsfvm/io/WriterFactory.hpp"
-#include <mpi.h>
+#include "alsuq/mpi/AbstractLoadBalancer.hpp"
+#include <vector>
+#include "alsuq/samples/SampleInformation.hpp"
+
 namespace alsuq {
-namespace io {
+namespace mpi {
 
-class MPIWriterFactory : public alsfvm::io::WriterFactory {
+class LoadBalancerFactory {
 public:
-
-    MPIWriterFactory(const std::vector<std::string>& groupNames,
-        size_t groupIndex,
-        bool createFile,
-        MPI_Comm mpiCommunicator,
-        MPI_Info mpiInfo,
-        int level, int sign);
+    static AbstractLoadBalancerPtr createLoadBalancer(const
+        std::vector<samples::SampleInformation>& sampleInformations);
 
 
-    alsfvm::shared_ptr<alsfvm::io::Writer>
-    createWriter(const std::string& name, const std::string& baseFilename,
-        const alsfvm::io::Parameters& parameters) override;
-
-private:
-    std::vector<std::string> groupNames;
-    size_t groupIndex;
-    bool createFile;
-    MPI_Comm mpiCommunicator;
-    MPI_Info mpiInfo;
-
-    const int level;
-    const int sign;
 };
-} // namespace io
+} // namespace mpi
 } // namespace alsuq

@@ -3,12 +3,12 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -19,13 +19,15 @@
 namespace alsuq {
 namespace mpi {
 
-SimpleLoadBalancer::SimpleLoadBalancer(const std::vector<size_t>& samples)
+SimpleLoadBalancer::SimpleLoadBalancer(const
+    std::vector<samples::SampleInformation>& samples)
     : samples(samples) {
 
 }
 
-std::tuple<std::vector<size_t>,
-ConfigurationPtr, ConfigurationPtr> SimpleLoadBalancer::loadBalance(
+std::tuple
+< LevelConfiguration, std::vector<samples::SampleInformation> >
+SimpleLoadBalancer::loadBalance(
     int multiSample, ivec3 multiSpatial, const Configuration& mpiConfig) {
     // Before going through this method, read a basic tutorial on mpi communicators,
     // eg http://mpitutorial.com/tutorials/introduction-to-groups-and-communicators/
@@ -60,6 +62,7 @@ ConfigurationPtr, ConfigurationPtr> SimpleLoadBalancer::loadBalance(
     }
 
 
+    LevelConfiguration levelConfiguration;
     int globalRank = mpiConfig.getRank();
     size_t numberOfSamplesPerProcess = (totalNumberOfSamples) / multiSample;
 
@@ -75,7 +78,7 @@ ConfigurationPtr, ConfigurationPtr> SimpleLoadBalancer::loadBalance(
             spatialRank);
 
     int rank = statisticalConfiguration->getRank();
-    std::vector<size_t> samplesForProcess;
+    std::vector<samples::SampleInformation> samplesForProcess;
     samplesForProcess.reserve(numberOfSamplesPerProcess);
 
 
@@ -93,11 +96,24 @@ ConfigurationPtr, ConfigurationPtr> SimpleLoadBalancer::loadBalance(
                 << "\n\ti= " << i);
         }
 
+        auto sample = samples[i];
+
+        if (sample.getLevel() != 0) {
+            THROW("The SimpleLoaddBalancer only supports single level, given level = "
+                << sample.getLevel());
+        }
+
+        levelConfiguration.setSpatialConfiguration(0, 1, spatialConfiguration);
+        levelConfiguration.setStochasticConfiguration(0, 1, statisticalConfiguration);
+        sample.setSpatialMpiConfiguration(spatialConfiguration);
+        sample.setStochasticMpiConfiguration(statisticalConfiguration);
+        sample.setMultiSpatial(multiSpatial);
+
         samplesForProcess.push_back(samples[i]);
     }
 
-    return std::make_tuple(samplesForProcess, statisticalConfiguration,
-            spatialConfiguration);
+    return std::make_tuple
+        (std::move(levelConfiguration), samplesForProcess);
 }
 
 }

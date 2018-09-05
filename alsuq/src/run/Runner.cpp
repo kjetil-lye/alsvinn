@@ -3,17 +3,18 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "alsuq/run/Runner.hpp"
+#include "alsuq/mpi/LevelConfiguration.hpp"
 
 #include "alsutils/log.hpp"
 
@@ -22,13 +23,13 @@ namespace run {
 
 Runner::Runner(std::shared_ptr<SimulatorCreator> simulatorCreator,
     std::shared_ptr<samples::SampleGenerator> sampleGenerator,
-    std::vector<size_t> sampleNumbers,
-    alsutils::mpi::ConfigurationPtr mpiConfig,
+    const std::vector<samples::SampleInformation>& samples,
+    alsuq::mpi::LevelConfiguration mpiConfig,
     const std::string& name)
     : simulatorCreator(simulatorCreator),
       sampleGenerator(sampleGenerator),
       parameterNames(sampleGenerator->getParameterList()),
-      sampleNumbers(sampleNumbers),
+      samples(samples),
       mpiConfig(mpiConfig),
       name(name)
 
@@ -37,22 +38,29 @@ Runner::Runner(std::shared_ptr<SimulatorCreator> simulatorCreator,
 }
 
 void Runner::run() {
-    std::shared_ptr<alsfvm::grid::Grid> grid;
+    std::map<int, std::map<int, std::shared_ptr<alsfvm::grid::Grid> > > grid;
 
-    for (size_t sample : sampleNumbers) {
-        ALSVINN_LOG(INFO, "Running sample: " << sample << std::endl);
+    for (auto& sample : samples) {
+        ALSVINN_LOG(INFO, "Running sample: " << sample.getSampleNumber() << std::endl);
         alsfvm::init::Parameters parameters;
 
         for (auto parameterName : parameterNames) {
-            auto samples = sampleGenerator->generate(parameterName, sample);
+            auto paramatersValues = sampleGenerator->generate(parameterName,
+                    sample.getSampleNumber());
             parameters.addParameter(parameterName,
-                samples);
+                paramatersValues);
 
         }
 
         auto simulator = simulatorCreator->createSimulator(parameters, sample);
 
-        for ( auto& statisticWriter : statistics) {
+
+        for ( auto& statisticWriter : statistics.at(sample.getLevel()).at(
+                sample.getSign())) {
+            statisticWriter->setMpiSpatialConfiguration(
+                sample.getSpatialMpiConfiguration());
+            statisticWriter->setMpiStochasticConfiguration(
+                sample.getStochasticMpiConfiguration());
             simulator->addWriter(std::dynamic_pointer_cast<alsfvm::io::Writer>
                 (statisticWriter));
 
@@ -73,16 +81,21 @@ void Runner::run() {
         }
 
         simulator->finalize();
-        grid = simulator->getGrid();
+        grid[sample.getLevel()][sample.getSign()] = simulator->getGrid();
 
     }
 
-    for (auto& statisticsWriter : statistics) {
-        statisticsWriter->combineStatistics();
+    for (auto& level : statistics) {
+        for (auto& sign : level.second) {
+            for (auto& statisticsWriter : sign.second) {
+                statisticsWriter->combineStatistics();
 
-        if (mpiConfig->getRank() == 0) {
-            statisticsWriter->finalizeStatistics();
-            statisticsWriter->writeStatistics(*grid);
+                if (mpiConfig.getStochasticConfiguration(level.first,
+                        sign.first)->getRank() == 0) {
+                    statisticsWriter->finalizeStatistics();
+                    statisticsWriter->writeStatistics(*grid[level.first][sign.first]);
+                }
+            }
         }
     }
 
@@ -91,7 +104,9 @@ void Runner::run() {
 
 
 void Runner::setStatistics(const
-    std::vector<std::shared_ptr<stats::Statistics> >& statistics) {
+    std::map<int, std::map<int, std::vector<std::shared_ptr<stats::Statistics> > > >
+    &
+    statistics) {
     this->statistics = statistics;
 }
 

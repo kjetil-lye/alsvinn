@@ -15,18 +15,16 @@
 
 #pragma once
 #include "alsuq/mpi/Configuration.hpp"
-#include <vector>
-#include <tuple>
-#include "alsuq/types.hpp"
 #include "alsuq/samples/SampleInformation.hpp"
+#include <vector>
+#include "alsuq/types.hpp"
 #include "alsuq/mpi/AbstractLoadBalancer.hpp"
-
 namespace alsuq {
 namespace mpi {
 
-class SimpleLoadBalancer : public AbstractLoadBalancer {
+class MultilevelLoadBalancer : public AbstractLoadBalancer {
 public:
-    SimpleLoadBalancer(const std::vector<samples::SampleInformation>& samples);
+    MultilevelLoadBalancer(const std::vector<samples::SampleInformation>& samples);
 
     //! @param multiSample the number of samples to run in parallel
     //!

@@ -24,34 +24,38 @@ namespace run {
 
 FiniteVolumeSimulatorCreator::FiniteVolumeSimulatorCreator(
     const std::string& configurationFile,
-    mpi::ConfigurationPtr mpiConfigurationSpatial,
-    mpi::ConfigurationPtr mpiConfigurationStatistical,
-    alsutils::mpi::ConfigurationPtr mpiConfigurationWorld,
-    ivec3 multiSpatial)
-    : mpiConfigurationSpatial(mpiConfigurationSpatial),
-      mpiConfigurationStatistical(mpiConfigurationStatistical),
-      mpiConfigurationWorld(mpiConfigurationWorld),
-      multiSpatial(multiSpatial),
-      filename(configurationFile) {
+    alsutils::mpi::ConfigurationPtr mpiConfigurationWorld)
+    :
+    mpiConfigurationWorld(mpiConfigurationWorld),
+
+    filename(configurationFile) {
 
 }
 
 alsfvm::shared_ptr<alsfvm::simulator::AbstractSimulator> FiniteVolumeSimulatorCreator::createSimulator(
     const alsfvm::init::Parameters& initialDataParameters,
-    size_t sampleNumber) {
+    const alsuq::samples::SampleInformation& sample) {
+    const int level = sample.getLevel();
 
-    auto groupNames = makeGroupNames(sampleNumber);
+    const int sign = sample.getSign();
+    auto mpiConfigurationSpatial = sample.getSpatialMpiConfiguration();
+    auto mpiConfigurationStatistical = sample.getStochasticMpiConfiguration();
+
+    auto multiSpatial = sample.getMultiSpatial();
+    auto groupNames = makeGroupNames(sample);
     std::shared_ptr<alsfvm::io::WriterFactory> writerFactory(
         new io::MPIWriterFactory(groupNames, mpiConfigurationStatistical->getRank(),
-            firstCall, mpiConfigurationWorld->getCommunicator(),
-            mpiConfigurationWorld->getInfo()));
+            !notFirstCall[level][sign], mpiConfigurationWorld->getCommunicator(),
+            mpiConfigurationWorld->getInfo(), level, sign));
 
-    firstCall = false;
+    notFirstCall[level][sign] = true;
     alsfvm::config::SimulatorSetup simulatorSetup;
 
     simulatorSetup.enableMPI(mpiConfigurationSpatial, multiSpatial.x,
         multiSpatial.y,
         multiSpatial.z);
+
+    simulatorSetup.setNumberOfGridCellsScaling(1 << sample.getLevel());
     simulatorSetup.setWriterFactory(writerFactory);
     auto simulatorPair = simulatorSetup.readSetupFromFile(filename);
 
@@ -66,19 +70,24 @@ alsfvm::shared_ptr<alsfvm::simulator::AbstractSimulator> FiniteVolumeSimulatorCr
 }
 
 std::vector<std::string> FiniteVolumeSimulatorCreator::makeGroupNames(
-    size_t sampleNumber) {
-    std::vector<size_t> samples(
-        mpiConfigurationStatistical->getNumberOfProcesses());
+    const samples::SampleInformation& sample) {
+    auto mpiConfigurationStatistical = sample.getStochasticMpiConfiguration();
+    std::vector<int> samples(
+        size_t(mpiConfigurationStatistical->getNumberOfProcesses()));
 
-    MPI_SAFE_CALL(MPI_Allgather((void*)&sampleNumber, 1, MPI_LONG_LONG_INT,
-            (void*) samples.data(), 1,
-            MPI_LONG_LONG_INT, mpiConfigurationStatistical->getCommunicator()));
+    int sampleNumber = sample.getSampleNumber();
+    MPI_SAFE_CALL(MPI_Allgather(static_cast<void*>(&sampleNumber), 1, MPI_INT,
+            static_cast<void*>( samples.data()), 1,
+            MPI_INT, mpiConfigurationStatistical->getCommunicator()));
+
+
+
 
     std::vector<std::string> groupNames;
     groupNames.reserve(samples.size());
 
-    for (size_t sample : samples) {
-        groupNames.push_back("sample_" + std::to_string(sample));
+    for (size_t sampleNumber : samples) {
+        groupNames.push_back("sample_" + sampleNumber);
     }
 
     return groupNames;

@@ -3,12 +3,12 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -16,9 +16,12 @@
 #pragma once
 #include <boost/property_tree/ptree.hpp>
 #include "alsuq/samples/SampleGenerator.hpp"
+#include "alsuq/samples/SampleInformation.hpp"
 #include "alsuq/mpi/Configuration.hpp"
 #include "alsuq/run/Runner.hpp"
 #include "alsuq/stats/Statistics.hpp"
+#include "alsuq/mpi/LevelConfiguration.hpp"
+
 namespace alsuq {
 namespace config {
 
@@ -46,15 +49,27 @@ public:
 
 private:
 
-    std::shared_ptr<samples::SampleGenerator> makeSampleGenerator(
-        ptree& configuration);
+    std::map<int, std::map<int, int> > makeNumberOfSamplesPerLevelPerSign(
+        const std::vector<size_t>& numberOfSamplesPerLevel);
 
-    std::vector<std::shared_ptr<stats::Statistics> > createStatistics(
+    std::shared_ptr<samples::SampleGenerator> makeSampleGenerator(
+        ptree& configuration, int numberOfSamples);
+
+    std::map < int, std::map<int, std::vector<std::shared_ptr<stats::Statistics> > > >
+    createStatistics(
         ptree& configuration,
-        alsutils::mpi::ConfigurationPtr statisticalConfiguration,
-        mpi::ConfigurationPtr spatialConfiguration,
-        mpi::ConfigurationPtr worldConfiguration);
-    size_t readNumberOfSamples(ptree& configuration);
+        mpi::ConfigurationPtr worldConfiguration,
+        mpi::LevelConfiguration levelConfiguration,
+        const std::map<int, std::map<int, int> >& samplesPerLevelSign);
+
+
+    std::vector<size_t> readNumberOfSamples(ptree& configuration);
+
+    std::vector<samples::SampleInformation> makeSamplesVector(
+        const std::vector<size_t>& samples);
+
+    int getNumberOfUniqueSamples(const std::vector<samples::SampleInformation>&
+        samples);
 };
 } // namespace config
 } // namespace alsuq

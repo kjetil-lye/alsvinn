@@ -18,6 +18,7 @@
 #include "alsuq/run/SimulatorCreator.hpp"
 #include "alsfvm/init/Parameters.hpp"
 #include "alsuq/mpi/Configuration.hpp"
+#include "alsuq/samples/SampleInformation.hpp"
 #include <mpi.h>
 #include "alsuq/types.hpp"
 
@@ -29,28 +30,22 @@ namespace run {
 class FiniteVolumeSimulatorCreator : public SimulatorCreator {
 public:
     FiniteVolumeSimulatorCreator(const std::string& configurationFile,
-        mpi::ConfigurationPtr mpiConfigurationSpatial,
-        mpi::ConfigurationPtr mpiConfigurationStatistical,
-        mpi::ConfigurationPtr mpiConfigurationWorld,
-        ivec3 multiSpatial
+        mpi::ConfigurationPtr mpiConfigurationWorld
     );
 
     alsfvm::shared_ptr<alsfvm::simulator::AbstractSimulator>
     createSimulator(const alsfvm::init::Parameters& initialDataParameters,
-        size_t sampleNumber) override;
+        const alsuq::samples::SampleInformation& sample) override;
 
 private:
-    mpi::ConfigurationPtr mpiConfigurationSpatial;
-    mpi::ConfigurationPtr mpiConfigurationStatistical;
+
     mpi::ConfigurationPtr mpiConfigurationWorld;
-
-    ivec3 multiSpatial;
-
     //! Gathers all the current samples from all current mpi procs
     //! and creates a list of names of the samples now being computed
-    std::vector<std::string> makeGroupNames(size_t sampleNumber);
+    std::vector<std::string> makeGroupNames(const samples::SampleInformation&
+        sample);
 
-    bool firstCall{true};
+    std::map<int, std::map<int, bool>> notFirstCall;
     const std::string filename;
 
 

@@ -20,6 +20,7 @@
 #include "alsuq/mpi/Configuration.hpp"
 #include <mpi.h>
 #include "alsuq/types.hpp"
+#include "alsuq/samples/SampleInformation.hpp"
 
 namespace alsuq {
 namespace run {
@@ -29,9 +30,11 @@ namespace run {
 class SimulatorCreator {
 public:
 
+    virtual ~SimulatorCreator() = default;
+
     virtual alsfvm::shared_ptr<alsfvm::simulator::AbstractSimulator>
     createSimulator(const alsfvm::init::Parameters& initialDataParameters,
-        size_t sampleNumber) = 0;
+        const alsuq::samples::SampleInformation& sampleNumber) = 0;
 
 };
 } // namespace run

@@ -18,6 +18,7 @@
 #include "alsuq/generator/GeneratorFactory.hpp"
 #include "alsuq/distribution/DistributionFactory.hpp"
 #include "alsuq/mpi/SimpleLoadBalancer.hpp"
+#include "alsuq/mpi/LoadBalancerFactory.hpp"
 #include <boost/property_tree/xml_parser.hpp>
 #include <fstream>
 #include "alsuq/stats/StatisticsFactory.hpp"
@@ -26,8 +27,10 @@
 
 #include "alsuq/stats/FixedIntervalStatistics.hpp"
 #include "alsuq/stats/TimeIntegratedWriter.hpp"
+#include "alsuq/samples/SampleInformation.hpp"
 #include <boost/algorithm/string.hpp>
 #include "alsutils/log.hpp"
+#include  <set>
 
 namespace alsuq {
 namespace config {
@@ -55,42 +58,44 @@ std::shared_ptr<run::Runner> Setup::makeRunner(const std::string& inputFilename,
     ptree configurationBase;
     boost::property_tree::read_xml(stream, configurationBase);
     auto configuration = configurationBase.get_child("config");
-    auto sampleGenerator = makeSampleGenerator(configuration);
-    auto numberOfSamples = readNumberOfSamples(configuration);
 
-    std::vector<size_t> samples;
-    samples.reserve(numberOfSamples);
+    auto numberOfSamplesPerLevel = readNumberOfSamples(configuration);
 
-    for (size_t i = 0; i < numberOfSamples; ++i) {
-        samples.push_back(i);
-    }
+    auto numberOfSamplesPerLevelPerSign = makeNumberOfSamplesPerLevelPerSign(
+            numberOfSamplesPerLevel);
+
+    auto sampleInformations = makeSamplesVector(numberOfSamplesPerLevel);
+
+    int numberOfUniqueSamples = getNumberOfUniqueSamples(sampleInformations);
+
+    auto sampleGenerator = makeSampleGenerator(configuration,
+            numberOfUniqueSamples);
+
+    mpi::AbstractLoadBalancerPtr loadBalancer =
+        mpi::LoadBalancerFactory::createLoadBalancer(sampleInformations);
 
 
-    mpi::SimpleLoadBalancer loadBalancer(samples);
-
-    auto loadBalanceConfiguration = loadBalancer.loadBalance(multiSample,
+    auto loadBalanceTuple = loadBalancer->loadBalance(multiSample,
             multiSpatial,
             *mpiConfigurationWorld);
-    auto& samplesForProc = std::get<0>(loadBalanceConfiguration);
-    auto statisticalConfiguration = std::get<1>(loadBalanceConfiguration);
-    auto spatialConfiguration = std::get<2>(loadBalanceConfiguration);
+
+    auto samplesForProc = std::get<1>(loadBalanceTuple);
+    auto levelConfiguration = std::get<0>(loadBalanceTuple);
 
 
     auto simulatorCreator = std::dynamic_pointer_cast<run::SimulatorCreator>
         (std::make_shared<run::FiniteVolumeSimulatorCreator>
             (inputFilename,
-                spatialConfiguration,
-                statisticalConfiguration,
-                mpiConfigurationWorld,
-                multiSpatial));
+                mpiConfigurationWorld
+            ));
 
     auto name = boost::algorithm::trim_copy(
             configuration.get<std::string>("fvm.name"));
     auto runner = std::make_shared<run::Runner>(simulatorCreator, sampleGenerator,
-            samplesForProc,
-            statisticalConfiguration, name);
-    auto statistics  = createStatistics(configuration, statisticalConfiguration,
-            spatialConfiguration, mpiConfigurationWorld);
+            samplesForProc, levelConfiguration, name);
+    auto statistics  = createStatistics(configuration, mpiConfigurationWorld,
+            levelConfiguration,
+            numberOfSamplesPerLevelPerSign);
     runner->setStatistics(statistics);
 
     // We want to make sure everything is created before going further
@@ -98,9 +103,26 @@ std::shared_ptr<run::Runner> Setup::makeRunner(const std::string& inputFilename,
     return runner;
 }
 
+std::map<int, std::map<int, int> > Setup::makeNumberOfSamplesPerLevelPerSign(
+    const std::vector<size_t>& numberOfSamplesPerLevel) {
+
+    std::map<int, std::map<int, int> > numberOfSamplesPerLevelPerSign;
+
+    for (size_t level = 0; level < numberOfSamplesPerLevel.size(); ++level) {
+        numberOfSamplesPerLevelPerSign[level][1] = numberOfSamplesPerLevel[level];
+
+        if (level < numberOfSamplesPerLevel.size() - 1) {
+            numberOfSamplesPerLevelPerSign[level + 1][-1] = numberOfSamplesPerLevel[level];
+
+        }
+    }
+
+    return numberOfSamplesPerLevelPerSign;
+}
+
 std::shared_ptr<samples::SampleGenerator> Setup::makeSampleGenerator(
-    Setup::ptree& configuration) {
-    auto numberOfSamples = readNumberOfSamples(configuration);
+    Setup::ptree& configuration, int numberOfSamples) {
+
 
     samples::SampleGenerator::GeneratorDistributionMap generators;
 
@@ -174,83 +196,140 @@ std::shared_ptr<samples::SampleGenerator> Setup::makeSampleGenerator(
 //   </writer>
 //   </stat>
 // </stats>
-std::vector<std::shared_ptr<stats::Statistics> > Setup::createStatistics(
-    Setup::ptree& configuration,
-    mpi::ConfigurationPtr statisticalConfiguration,
-    mpi::ConfigurationPtr spatialConfiguration,
-    mpi::ConfigurationPtr worldConfiguration) {
+std::map < int, std::map<int, std::vector<std::shared_ptr<stats::Statistics> > > > Setup::createStatistics(
+    ptree& configuration,
+    mpi::ConfigurationPtr worldConfiguration,
+    mpi::LevelConfiguration levelConfiguration,
+    const std::map<int, std::map<int, int> >& samplesPerLevelSign) {
     auto statisticsNodes = configuration.get_child("uq.stats");
     stats::StatisticsFactory statisticsFactory;
-    std::shared_ptr<alsfvm::io::WriterFactory> writerFactory;
 
-    if (spatialConfiguration->getNumberOfProcesses() > 1) {
-        writerFactory.reset(new alsfvm::io::MpiWriterFactory(spatialConfiguration));
-    } else {
-        writerFactory.reset(new alsfvm::io::WriterFactory());
+
+    std::map < int, std::map<int, std::vector<std::shared_ptr<stats::Statistics> > > >
+    statisticsMap;
+
+    for (int level = 0; level < levelConfiguration.getNumberOfLevels(); ++level) {
+        for (int sign : levelConfiguration.getSigns(level)) {
+
+            auto numberOfSamplesAtLevel = samplesPerLevelSign.at(level).at(sign);
+            std::shared_ptr<alsfvm::io::WriterFactory> writerFactory;
+
+
+            auto spatialConfiguration = levelConfiguration.getSpatialConfiguration(level,
+                    sign);
+
+            if (spatialConfiguration->getNumberOfProcesses() > 1) {
+                writerFactory.reset(new alsfvm::io::MpiWriterFactory(spatialConfiguration));
+            } else {
+                writerFactory.reset(new alsfvm::io::WriterFactory());
+            }
+
+            auto platform = configuration.get<std::string>("fvm.platform");
+            std::vector<std::shared_ptr<stats::Statistics> > statisticsVector;
+
+            for (auto& statisticsNode : statisticsNodes) {
+                auto name = statisticsNode.second.get<std::string>("name");
+                boost::trim(name);
+                stats::StatisticsParameters parameters(statisticsNode.second);
+
+                parameters.setNumberOfSamples(numberOfSamplesAtLevel);
+                parameters.setPlatform(platform);
+                auto statistics = statisticsFactory.makeStatistics(platform, name, parameters);
+
+
+
+
+                // Make writer
+                std::string type = statisticsNode.second.get<std::string>("writer.type");
+                std::string basename =
+                    statisticsNode.second.get<std::string>("writer.basename");
+
+                for (auto statisticsName : statistics->getStatisticsNames()) {
+
+                    auto outputname = basename + "_" + statisticsName;
+                    auto baseWriter = writerFactory->createWriter(type, outputname,
+                            alsfvm::io::Parameters(statisticsNode.second.get_child("writer")));
+                    baseWriter->addAttributes("uqAttributes", configuration);
+                    statistics->addWriter(statisticsName, baseWriter);
+                }
+
+                if (statisticsNode.second.find("numberOfSaves") !=
+                    statisticsNode.second.not_found()) {
+
+
+
+                    auto numberOfSaves = statisticsNode.second.get<size_t>("numberOfSaves");
+                    ALSVINN_LOG(INFO, "statistics.numberOfSaves = " << numberOfSaves);
+                    real endTime = configuration.get<real>("fvm.endTime");
+                    real timeInterval = endTime / numberOfSaves;
+                    auto statisticsInterval =
+                        std::shared_ptr<stats::Statistics>(
+                            new stats::FixedIntervalStatistics(statistics, timeInterval,
+                                endTime));
+                    statisticsVector.push_back(statisticsInterval);
+                } else if (statisticsNode.second.find("time") !=
+                    statisticsNode.second.not_found()) {
+                    const real time = statisticsNode.second.get<real>("time");
+                    const real radius = statisticsNode.second.get<real>("timeRadius");
+
+                    auto timeIntegrator = std::shared_ptr<stats::Statistics>(
+                            new stats::TimeIntegratedWriter(statistics, time,
+                                radius));
+                    statisticsVector.push_back(timeIntegrator);
+                }
+
+
+            }
+
+            statisticsMap[level][sign] = statisticsVector;
+        }
     }
 
-    auto platform = configuration.get<std::string>("fvm.platform");
-    std::vector<std::shared_ptr<stats::Statistics> > statisticsVector;
-
-    for (auto& statisticsNode : statisticsNodes) {
-        auto name = statisticsNode.second.get<std::string>("name");
-        boost::trim(name);
-        stats::StatisticsParameters parameters(statisticsNode.second);
-        parameters.setMpiConfiguration(statisticalConfiguration);
-        parameters.setNumberOfSamples(readNumberOfSamples(configuration));
-        parameters.setPlatform(platform);
-        auto statistics = statisticsFactory.makeStatistics(platform, name, parameters);
-
-
-
-
-        // Make writer
-        std::string type = statisticsNode.second.get<std::string>("writer.type");
-        std::string basename =
-            statisticsNode.second.get<std::string>("writer.basename");
-
-        for (auto statisticsName : statistics->getStatisticsNames()) {
-
-            auto outputname = basename + "_" + statisticsName;
-            auto baseWriter = writerFactory->createWriter(type, outputname,
-                    alsfvm::io::Parameters(statisticsNode.second.get_child("writer")));
-            baseWriter->addAttributes("uqAttributes", configuration);
-            statistics->addWriter(statisticsName, baseWriter);
-        }
-
-        if (statisticsNode.second.find("numberOfSaves") !=
-            statisticsNode.second.not_found()) {
-
-
-
-            auto numberOfSaves = statisticsNode.second.get<size_t>("numberOfSaves");
-            ALSVINN_LOG(INFO, "statistics.numberOfSaves = " << numberOfSaves);
-            real endTime = configuration.get<real>("fvm.endTime");
-            real timeInterval = endTime / numberOfSaves;
-            auto statisticsInterval =
-                std::shared_ptr<stats::Statistics>(
-                    new stats::FixedIntervalStatistics(statistics, timeInterval,
-                        endTime));
-            statisticsVector.push_back(statisticsInterval);
-        } else if (statisticsNode.second.find("time") !=
-            statisticsNode.second.not_found()) {
-            const real time = statisticsNode.second.get<real>("time");
-            const real radius = statisticsNode.second.get<real>("timeRadius");
-
-            auto timeIntegrator = std::shared_ptr<stats::Statistics>(
-                    new stats::TimeIntegratedWriter(statistics, time,
-                        radius));
-            statisticsVector.push_back(timeIntegrator);
-        }
-
-
-    }
-
-    return statisticsVector;
+    return statisticsMap;
 }
 
-size_t Setup::readNumberOfSamples(Setup::ptree& configuration) {
-    return configuration.get<real>("uq.samples");
+std::vector<size_t> Setup::readNumberOfSamples(Setup::ptree& configuration) {
+    auto samplesText =  configuration.get<std::string>("uq.samples");
+
+    std::vector<std::string> samplesPerLevelText;
+    boost::split(samplesPerLevelText, samplesText, boost::is_any_of(" \t"));
+
+    std::vector<size_t> samplesPerLevel;
+
+    for (const auto& samplesText : samplesPerLevelText) {
+        samplesPerLevel.push_back(boost::lexical_cast<size_t>(samplesText));
+    }
+
+    return samplesPerLevel;
+
+}
+
+std::vector<samples::SampleInformation> Setup::makeSamplesVector(
+    const std::vector<size_t>& sampleNumbers) {
+    std::vector<samples::SampleInformation> sampleInformation;
+
+    for (size_t level = 0; level < sampleNumbers.size(); ++level) {
+        for (size_t sample = 0; sample < sampleNumbers[level]; ++sample) {
+            sampleInformation.push_back(samples::SampleInformation(sample, level, 1));
+
+            if (level < sampleNumbers.size() - 1) {
+                sampleInformation.push_back(samples::SampleInformation(sample, level + 1, -1));
+            }
+        }
+    }
+
+    return sampleInformation;
+}
+
+int Setup::getNumberOfUniqueSamples(const
+    std::vector<samples::SampleInformation>& samples) {
+    std::set<int> sampleIds;
+
+    for (const auto& sample : samples) {
+        sampleIds.insert(sample.getSampleNumber());
+    }
+
+    return sampleIds.size();
 }
 }
 }

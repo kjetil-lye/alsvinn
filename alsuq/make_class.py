@@ -23,7 +23,9 @@ def directoryExists(directoryName):
 
 def createDirectory(directory):
     os.mkdir(directory)
-
+def getCopyrightHeader():
+    with open('../preamble_copyright.txt') as f:
+        return f.read()
 def writeToFile(filename, content):
     if os.path.exists(filename):
         raise Exception("File %s already exists!" % filename)
@@ -36,6 +38,9 @@ def writeToFile(filename, content):
         if not directoryExists(fullPath):
             createDirectory(fullPath)
     with open(filename, "w") as file:
+        header = getCopyrightHeader()
+        file.write(header)
+        file.write("\n")
         file.write(content)
     
 """

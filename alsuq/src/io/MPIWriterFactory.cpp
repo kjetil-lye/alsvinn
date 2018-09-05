@@ -24,11 +24,12 @@ namespace io {
 MPIWriterFactory::MPIWriterFactory(const std::vector<std::string>& groupNames,
     size_t groupIndex,
     bool createFile,
-    MPI_Comm mpiCommunicator, MPI_Info mpiInfo)
+    MPI_Comm mpiCommunicator, MPI_Info mpiInfo,
+    int level, int sign)
 
     : groupNames(groupNames), groupIndex(groupIndex), createFile(createFile),
       mpiCommunicator(mpiCommunicator),
-      mpiInfo(mpiInfo) {
+      mpiInfo(mpiInfo), level(level), sign(sign) {
 
 }
 
@@ -37,6 +38,8 @@ alsfvm::shared_ptr<alsfvm::io::Writer> MPIWriterFactory::createWriter(
     const std::string& baseFilename,
     const alsutils::parameters::Parameters& parameters) {
 
+    auto baseLevelName = baseFilename + std::string("_") + std::to_string(
+            level) + std::string("_") + std::to_string(sign > 0);
     mpi::ConfigurationPtr configuration = std::make_shared<mpi::Configuration>
         (mpiCommunicator, "cpu");
 
@@ -49,16 +52,16 @@ alsfvm::shared_ptr<alsfvm::io::Writer> MPIWriterFactory::createWriter(
     parameterCopy.addIntegerParameter("group_index", groupIndex);
 
     if (name == "hdf5") {
-        writer.reset(new alsfvm::io::HDF5MPIWriter(baseFilename, groupNames,
+        writer.reset(new alsfvm::io::HDF5MPIWriter(baseLevelName, groupNames,
                 groupIndex, createFile, mpiCommunicator,
                 mpiInfo));
     } else if (name == "netcdf") {
-        writer.reset(new alsfvm::io::NetCDFMPIWriter(baseFilename, groupNames,
+        writer.reset(new alsfvm::io::NetCDFMPIWriter(baseLevelName, groupNames,
                 groupIndex, createFile, mpiCommunicator,
                 mpiInfo));
 
     } else if (name == "python") {
-        writer.reset(new alsfvm::io::PythonScript(baseFilename, parameterCopy,
+        writer.reset(new alsfvm::io::PythonScript(baseLevelName, parameterCopy,
                 configuration));
     } else {
         THROW("Unknown writer " << name);

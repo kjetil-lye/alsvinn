@@ -14,19 +14,18 @@
  */
 
 #pragma once
-#include "alsuq/mpi/Configuration.hpp"
-#include <vector>
-#include <tuple>
 #include "alsuq/types.hpp"
+#include <tuple>
+#include "alsuq/mpi/Configuration.hpp"
 #include "alsuq/samples/SampleInformation.hpp"
-#include "alsuq/mpi/AbstractLoadBalancer.hpp"
+#include "alsuq/mpi/LevelConfiguration.hpp"
 
 namespace alsuq {
 namespace mpi {
 
-class SimpleLoadBalancer : public AbstractLoadBalancer {
+class AbstractLoadBalancer {
 public:
-    SimpleLoadBalancer(const std::vector<samples::SampleInformation>& samples);
+    virtual ~AbstractLoadBalancer() = default;
 
     //! @param multiSample the number of samples to run in parallel
     //!
@@ -45,10 +44,8 @@ public:
     < LevelConfiguration, std::vector<samples::SampleInformation> >
     loadBalance(
         int multiSample, ivec3 multiSpatial,
-        const Configuration& mpiConfig) override;
-
-private:
-    std::vector<samples::SampleInformation> samples;
+        const Configuration& mpiConfig) = 0;
 };
+using AbstractLoadBalancerPtr = std::shared_ptr<AbstractLoadBalancer>;
 } // namespace mpi
 } // namespace alsuq

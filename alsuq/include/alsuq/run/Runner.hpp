@@ -3,21 +3,22 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
+#include <map>
 #include "alsuq/samples/SampleGenerator.hpp"
 #include "alsuq/run/SimulatorCreator.hpp"
 #include "alsuq/stats/Statistics.hpp"
-
+#include "alsuq/mpi/LevelConfiguration.hpp"
 namespace alsuq {
 namespace run {
 
@@ -25,8 +26,8 @@ class Runner {
 public:
     Runner(std::shared_ptr<SimulatorCreator> simulatorCreator,
         std::shared_ptr<samples::SampleGenerator> sampleGenerator,
-        std::vector<size_t> sampleNumbers,
-        mpi::ConfigurationPtr mpiConfig,
+        const std::vector<samples::SampleInformation>& samples,
+        alsuq::mpi::LevelConfiguration mpiConfig,
         const std::string& name);
 
 
@@ -36,7 +37,9 @@ public:
 
 
     //! Sets the statistics to be used
-    void setStatistics(const std::vector<std::shared_ptr<stats::Statistics> >&
+    void setStatistics(const
+        std::map<int, std::map<int, std::vector<std::shared_ptr<stats::Statistics> > > >
+        &
         statistics);
     std::string getName() const;
 
@@ -46,10 +49,12 @@ private:
     std::shared_ptr<SimulatorCreator> simulatorCreator;
     std::shared_ptr<samples::SampleGenerator> sampleGenerator;
     std::vector<std::string> parameterNames;
-    std::vector<size_t> sampleNumbers;
-    std::vector<std::shared_ptr<stats::Statistics> > statistics;
+    std::vector<samples::SampleInformation> samples;
 
-    mpi::ConfigurationPtr mpiConfig;
+    std::map<int, std::map<int, std::vector<std::shared_ptr<stats::Statistics> > > >
+    statistics;
+
+    alsuq::mpi::LevelConfiguration mpiConfig;
     const std::string name;
     size_t timestepsPerformedTotal = 0;
 };

@@ -235,7 +235,14 @@ void SimulatorSetup::enableMPI(alsutils::mpi::ConfigurationPtr configuration,
     writerFactory.reset(new io::MpiWriterFactory(mpiConfiguration));
     setWriterFactory(writerFactory);
 }
+
+
 #endif
+
+void SimulatorSetup::setNumberOfGridCellsScaling(int scalingDivisor) {
+    numberOfGridCellsScaling = scalingDivisor;
+}
+
 
 
 alsfvm::shared_ptr<grid::Grid> SimulatorSetup::createGrid(
@@ -247,9 +254,15 @@ alsfvm::shared_ptr<grid::Grid> SimulatorSetup::createGrid(
     const std::string& dimensionString = gridNode.get<std::string>("dimension");
 
 
+
+
     auto lowerCorner = parseVector<real>(lowerCornerString);
     auto upperCorner = parseVector<real>(upperCornerString);
     auto dimension = parseVector<int>(dimensionString);
+
+    for (size_t i = 0; i < dimension.size(); ++i) {
+        dimension[i] = std::max(dimension[i] / numberOfGridCellsScaling, 1);
+    }
 
     auto boundaryName = readBoundary(configuration);
 

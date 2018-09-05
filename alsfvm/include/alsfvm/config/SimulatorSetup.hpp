@@ -47,7 +47,11 @@ public:
     //! Call to enable mpi. Has to be called *before* readSetupFromFile.
     void enableMPI(mpi::ConfigurationPtr configuration, int multiX, int multiY,
         int multiZ);
+
 #endif
+
+
+    void setNumberOfGridCellsScaling(int scalingDivisor);
 protected:
 
     alsfvm::shared_ptr<init::InitialData> createInitialData(
@@ -99,6 +103,9 @@ protected:
     //! the .xml file was located
     void loadFiles(
         boost::property_tree::ptree& configuration);
+
+
+    int numberOfGridCellsScaling = 1;
 };
 } // namespace alsfvm
 } // namespace config

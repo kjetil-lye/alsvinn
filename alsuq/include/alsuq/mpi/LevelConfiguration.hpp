@@ -14,35 +14,39 @@
  */
 
 #pragma once
-#include "alsfvm/io/WriterFactory.hpp"
-#include <mpi.h>
-namespace alsuq {
-namespace io {
+#include "alsuq/mpi/Configuration.hpp"
+#include <map>
 
-class MPIWriterFactory : public alsfvm::io::WriterFactory {
+namespace alsuq {
+namespace mpi {
+
+class LevelConfiguration {
 public:
 
-    MPIWriterFactory(const std::vector<std::string>& groupNames,
-        size_t groupIndex,
-        bool createFile,
-        MPI_Comm mpiCommunicator,
-        MPI_Info mpiInfo,
-        int level, int sign);
+    alsuq::mpi::ConfigurationPtr getSpatialConfiguration(int level, int sign) const;
+
+    alsuq::mpi::ConfigurationPtr getStochasticConfiguration(int level,
+        int sign) const;
 
 
-    alsfvm::shared_ptr<alsfvm::io::Writer>
-    createWriter(const std::string& name, const std::string& baseFilename,
-        const alsfvm::io::Parameters& parameters) override;
+    void setSpatialConfiguration(int level, int sign,
+        alsuq::mpi::ConfigurationPtr ptr);
+
+    void setStochasticConfiguration(int level,
+        int sign, alsuq::mpi::ConfigurationPtr ptr);
+
+    int getNumberOfLevels() const;
+    std::vector<int> getSigns(int level) const;
 
 private:
-    std::vector<std::string> groupNames;
-    size_t groupIndex;
-    bool createFile;
-    MPI_Comm mpiCommunicator;
-    MPI_Info mpiInfo;
 
-    const int level;
-    const int sign;
+    std::map<int, std::map<int, alsuq::mpi::ConfigurationPtr> >
+    spatialConfigurations;
+
+    std::map<int, std::map<int, alsuq::mpi::ConfigurationPtr> >
+    stochasticConfiguration;
+
+
 };
-} // namespace io
+} // namespace mpi
 } // namespace alsuq
