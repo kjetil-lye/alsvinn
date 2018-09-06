@@ -79,10 +79,8 @@ std::vector<int> LevelConfiguration::getSigns(int level) const {
     } else {
         if (level == 0) {
             return {{1}};
-        } else if (level == getNumberOfLevels() - 1) {
-            return {{1}};
         } else {
-            return {{-1, 1}};
+            return {{1, -1}};
         }
     }
 }

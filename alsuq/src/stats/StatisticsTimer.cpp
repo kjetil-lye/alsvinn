@@ -86,5 +86,17 @@ void StatisticsTimer::writeStatistics(const alsfvm::grid::Grid& grids) {
     statistics->writeStatistics(grids);
 }
 
+void StatisticsTimer::setMpiSpatialConfiguration(const
+    alsutils::mpi::ConfigurationPtr& value) {
+    Statistics::setMpiSpatialConfiguration(value);
+    statistics->setMpiSpatialConfiguration(value);
+}
+
+void StatisticsTimer::setMpiStochasticConfiguration(const
+    alsutils::mpi::ConfigurationPtr& value) {
+    Statistics::setMpiStochasticConfiguration(value);
+    statistics->setMpiStochasticConfiguration(value);
+}
+
 }
 }

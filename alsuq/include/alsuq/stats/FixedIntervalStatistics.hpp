@@ -3,12 +3,12 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -60,6 +60,12 @@ public:
     //! To be called in the end, this could be to eg compute the variance
     //! through M_2-mean^2 or any other postprocessing needed
     virtual void finalizeStatistics() override;
+
+    virtual void setMpiSpatialConfiguration(const mpi::ConfigurationPtr& value)
+    override;
+
+    virtual void setMpiStochasticConfiguration(const mpi::ConfigurationPtr& value)
+    override;
 
 protected:
     virtual void computeStatistics(const alsfvm::volume::Volume& conservedVariables,

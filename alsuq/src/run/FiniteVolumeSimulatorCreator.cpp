@@ -18,6 +18,7 @@
 #include "alsuq/io/MPIWriterFactory.hpp"
 #include "alsuq/mpi/Configuration.hpp"
 #include "alsuq/mpi/utils.hpp"
+#include "alsutils/timer/Timer.hpp"
 
 namespace alsuq {
 namespace run {
@@ -35,6 +36,9 @@ FiniteVolumeSimulatorCreator::FiniteVolumeSimulatorCreator(
 alsfvm::shared_ptr<alsfvm::simulator::AbstractSimulator> FiniteVolumeSimulatorCreator::createSimulator(
     const alsfvm::init::Parameters& initialDataParameters,
     const alsuq::samples::SampleInformation& sample) {
+
+    ALSVINN_TIME_BLOCK(alsvinn, uq, create_simulator);
+
     const int level = sample.getLevel();
 
     const int sign = sample.getSign();

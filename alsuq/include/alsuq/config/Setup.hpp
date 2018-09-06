@@ -66,7 +66,8 @@ private:
     std::vector<size_t> readNumberOfSamples(ptree& configuration);
 
     std::vector<samples::SampleInformation> makeSamplesVector(
-        const std::vector<size_t>& samples);
+        const std::vector<size_t>& samplesPerLevel,
+        size_t sampleStart);
 
     int getNumberOfUniqueSamples(const std::vector<samples::SampleInformation>&
         samples);

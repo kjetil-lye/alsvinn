@@ -23,7 +23,6 @@ namespace {
 // so that we generate independent samples
 std::pair<std::mt19937_64, int>& getGeneratorInstance() {
     static std::pair<std::mt19937_64, int> generator;
-
     return generator;
 }
 }
@@ -40,6 +39,11 @@ real STLMersenne::generate(size_t component, size_t sample) {
     if (int(component) >= dimension) {
         THROW("Component given higher than dimension. component = "
             << component << ", dimension = " << dimension);
+    }
+
+    if (component * dimension + sample < generator.second) {
+        generator.first.seed();
+        generator.second = 0;
     }
 
     while (generator.second / dimension < int(sample) - 1) {

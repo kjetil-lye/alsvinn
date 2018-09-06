@@ -53,6 +53,12 @@ public:
 
     virtual void writeStatistics(const alsfvm::grid::Grid& grids) override;
 
+    virtual void setMpiSpatialConfiguration(const mpi::ConfigurationPtr& value)
+    override;
+
+    virtual void setMpiStochasticConfiguration(const mpi::ConfigurationPtr& value)
+    override;
+
 private:
     std::string name;
     const std::shared_ptr<Statistics> statistics;

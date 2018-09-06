@@ -60,7 +60,6 @@ std::shared_ptr<run::Runner> Setup::makeRunner(const std::string& inputFilename,
     ptree configurationBase;
     boost::property_tree::read_xml(stream, configurationBase);
     auto configuration = configurationBase.get_child("config");
-    auto sampleGenerator = makeSampleGenerator(configuration);
     auto sampleStart = readSampleStart(configuration);
 
     ALSVINN_LOG(INFO, "sampleStart = " << sampleStart);
@@ -70,7 +69,8 @@ std::shared_ptr<run::Runner> Setup::makeRunner(const std::string& inputFilename,
     auto numberOfSamplesPerLevelPerSign = makeNumberOfSamplesPerLevelPerSign(
             numberOfSamplesPerLevel);
 
-    auto sampleInformations = makeSamplesVector(numberOfSamplesPerLevel);
+    auto sampleInformations = makeSamplesVector(numberOfSamplesPerLevel,
+            sampleStart);
 
     int numberOfUniqueSamples = getNumberOfUniqueSamples(sampleInformations);
 
@@ -250,6 +250,14 @@ std::map < int, std::map<int, std::vector<std::shared_ptr<stats::Statistics> > >
                 std::string basename =
                     statisticsNode.second.get<std::string>("writer.basename");
 
+                basename = basename + "_" + std::to_string(level) + "_" + std::to_string(
+                        sign > 0);
+
+                statistics->setMpiSpatialConfiguration(
+                    levelConfiguration.getSpatialConfiguration(level, sign));
+                statistics->setMpiStochasticConfiguration(
+                    levelConfiguration.getStochasticConfiguration(level, sign));
+
                 for (auto statisticsName : statistics->getStatisticsNames()) {
 
                     auto outputname = basename + "_" + statisticsName;
@@ -311,15 +319,17 @@ std::vector<size_t> Setup::readNumberOfSamples(Setup::ptree& configuration) {
 }
 
 std::vector<samples::SampleInformation> Setup::makeSamplesVector(
-    const std::vector<size_t>& sampleNumbers) {
+    const std::vector<size_t>& samplesPerLevel, size_t sampleStart) {
     std::vector<samples::SampleInformation> sampleInformation;
 
-    for (size_t level = 0; level < sampleNumbers.size(); ++level) {
-        for (size_t sample = 0; sample < sampleNumbers[level]; ++sample) {
-            sampleInformation.push_back(samples::SampleInformation(sample, level, 1));
+    for (size_t level = 0; level < samplesPerLevel.size(); ++level) {
+        for (size_t sample = 0; sample < samplesPerLevel[level]; ++sample) {
+            sampleInformation.push_back(samples::SampleInformation(sampleStart + sample,
+                    level, 1));
 
-            if (level < sampleNumbers.size() - 1) {
-                sampleInformation.push_back(samples::SampleInformation(sample, level + 1, -1));
+            if (level < samplesPerLevel.size() - 1) {
+                sampleInformation.push_back(samples::SampleInformation(sampleStart + sample,
+                        level + 1, -1));
             }
         }
     }
@@ -329,6 +339,8 @@ std::vector<samples::SampleInformation> Setup::makeSamplesVector(
 
 int Setup::getNumberOfUniqueSamples(const
     std::vector<samples::SampleInformation>& samples) {
+
+    ALSVINN_TIME_BLOCK(alsvinn, uq, find_unique_samples);
     std::set<int> sampleIds;
 
     for (const auto& sample : samples) {

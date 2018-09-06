@@ -3,12 +3,12 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -22,8 +22,7 @@ namespace alsuq {
 namespace stats {
 StatisticsHelper::StatisticsHelper(const StatisticsParameters& parameters)
 
-    : samples(parameters.getNumberOfSamples()),
-      mpiConfig(parameters.getMpiConfiguration()) {
+    : samples(parameters.getNumberOfSamples()) {
 
 }
 
@@ -56,14 +55,14 @@ void StatisticsHelper::combineStatistics() {
 
 
                     std::shared_ptr<alsfvm::memory::Memory<real> > dataReduced;
-                    //if (mpiConfig.getRank() == 0) {
+
                     dataReduced = statisticsDataToReduce->makeInstance();
-                    //}
+
                     MPI_SAFE_CALL(MPI_Reduce(statisticsDataToReduce->data(), dataReduced->data(),
                             statisticsDataToReduce->getSize(), MPI_DOUBLE, MPI_SUM, 0,
-                            mpiConfig->getCommunicator()));
+                            getMpiStochasticConfiguration()->getCommunicator()));
 
-                    if (mpiConfig->getRank() == 0) {
+                    if (getMpiStochasticConfiguration()->getRank() == 0) {
                         statisticsData->copyFrom(*dataReduced);
                     }
 

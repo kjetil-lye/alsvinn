@@ -45,10 +45,10 @@ void Runner::run() {
         alsfvm::init::Parameters parameters;
 
         for (auto parameterName : parameterNames) {
-            auto paramatersValues = sampleGenerator->generate(parameterName,
+            auto parametersValues = sampleGenerator->generate(parameterName,
                     sample.getSampleNumber());
             parameters.addParameter(parameterName,
-                paramatersValues);
+                parametersValues);
 
         }
 
@@ -57,10 +57,8 @@ void Runner::run() {
 
         for ( auto& statisticWriter : statistics.at(sample.getLevel()).at(
                 sample.getSign())) {
-            statisticWriter->setMpiSpatialConfiguration(
-                sample.getSpatialMpiConfiguration());
-            statisticWriter->setMpiStochasticConfiguration(
-                sample.getStochasticMpiConfiguration());
+
+
             simulator->addWriter(std::dynamic_pointer_cast<alsfvm::io::Writer>
                 (statisticWriter));
 

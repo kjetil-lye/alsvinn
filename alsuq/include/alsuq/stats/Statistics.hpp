@@ -61,9 +61,9 @@ public:
 
     virtual void writeStatistics(const alsfvm::grid::Grid& grid) = 0;
 
-    void setMpiSpatialConfiguration(const mpi::ConfigurationPtr& value);
+    virtual void setMpiSpatialConfiguration(const mpi::ConfigurationPtr& value);
 
-    void setMpiStochasticConfiguration(const mpi::ConfigurationPtr& value);
+    virtual void setMpiStochasticConfiguration(const mpi::ConfigurationPtr& value);
 protected:
     mpi::ConfigurationPtr getMpiSpatialConfiguration() const;
 
