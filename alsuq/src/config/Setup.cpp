@@ -31,6 +31,7 @@
 #include <boost/algorithm/string.hpp>
 #include "alsutils/log.hpp"
 #include  <set>
+#include "alsutils/timer/Timer.hpp"
 
 namespace alsuq {
 namespace config {
@@ -54,12 +55,17 @@ namespace config {
 std::shared_ptr<run::Runner> Setup::makeRunner(const std::string& inputFilename,
     alsutils::mpi::ConfigurationPtr mpiConfigurationWorld,
     int multiSample, ivec3 multiSpatial) {
+    ALSVINN_TIME_BLOCK(alsvinn, uq, init);
     std::ifstream stream(inputFilename);
     ptree configurationBase;
     boost::property_tree::read_xml(stream, configurationBase);
     auto configuration = configurationBase.get_child("config");
+    auto sampleGenerator = makeSampleGenerator(configuration);
+    auto sampleStart = readSampleStart(configuration);
 
+    ALSVINN_LOG(INFO, "sampleStart = " << sampleStart);
     auto numberOfSamplesPerLevel = readNumberOfSamples(configuration);
+
 
     auto numberOfSamplesPerLevelPerSign = makeNumberOfSamplesPerLevelPerSign(
             numberOfSamplesPerLevel);
@@ -330,6 +336,17 @@ int Setup::getNumberOfUniqueSamples(const
     }
 
     return sampleIds.size();
+}
+
+size_t Setup::readSampleStart(Setup::ptree& configuration) {
+    auto& uq = configuration.get_child("uq");
+
+    if (uq.find("sampleStart") != uq.not_found()) {
+        ALSVINN_LOG(INFO, "sampleStart tag present");
+        return uq.get<size_t>("sampleStart");
+    }
+
+    return 0;
 }
 }
 }

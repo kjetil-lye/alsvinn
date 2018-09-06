@@ -70,6 +70,7 @@ private:
 
     int getNumberOfUniqueSamples(const std::vector<samples::SampleInformation>&
         samples);
+    size_t readSampleStart(ptree& configuration);
 };
 } // namespace config
 } // namespace alsuq
