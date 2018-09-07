@@ -3,12 +3,12 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -41,7 +41,8 @@ public:
     //!    4   |     < not used > |   < not used >  |    front
     //!    5   |     < not used > |   < not used >  |    back
     CudaCartesianCellExchanger(ConfigurationPtr& configuration,
-        const ivec6& neighbours);
+        const ivec6& neighbours,
+        const std::array<int, 8>& cornerNeighbours);
 
     RequestContainer exchangeCells(volume::Volume& outputVolume,
         const volume::Volume& inputVolume) override;
@@ -56,6 +57,7 @@ public:
 private:
     ConfigurationPtr configuration;
     ivec6 neighbours;
+    const std::array<int, 8> cornerNeighbours;
 
     // for each variable, for each side
     std::vector<std::vector<alsfvm::shared_ptr<cuda::CudaMemory<real> > > > buffers;

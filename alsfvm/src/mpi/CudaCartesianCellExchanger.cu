@@ -74,8 +74,8 @@ __global__ void insertSideDevice(memory::View<real> output,
 
 }
 CudaCartesianCellExchanger::CudaCartesianCellExchanger(ConfigurationPtr&
-    configuration, const ivec6& neighbours)
-    : configuration(configuration), neighbours(neighbours) {
+    configuration, const ivec6& neighbours, const std::array<int, 8>& cornerNeighbours)
+    : configuration(configuration), neighbours(neighbours), cornerNeighbours(cornerNeighbours) {
 
 
 }

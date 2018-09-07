@@ -42,8 +42,11 @@ public:
     //!    3   |     < not used > |     top         |    top
     //!    4   |     < not used > |   < not used >  |    front
     //!    5   |     < not used > |   < not used >  |    back
+    //!
+    //! @param cornerNeighbours neighbours for each corner
     CartesianCellExchanger(ConfigurationPtr& configuration,
-        const ivec6& neighbours);
+        const ivec6& neighbours,
+        const std::array<int, 8>& cornerNeighbours);
 
     //! Does the exchange of data
     virtual RequestContainer exchangeCells(alsfvm::volume::Volume& outputVolume,
@@ -59,6 +62,7 @@ private:
     ConfigurationPtr configuration;
 
     const ivec6 neighbours;
+    const std::array<int, 8> cornerNeighbours;
 
     std::vector<MpiIndexTypePtr> datatypesReceive;
     std::vector<MpiIndexTypePtr> datatypesSend;

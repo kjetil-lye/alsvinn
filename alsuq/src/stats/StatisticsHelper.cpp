@@ -17,13 +17,15 @@
 #include "alsuq/mpi/utils.hpp"
 #include "alsutils/mpi/cuda.hpp"
 #include "alsutils/log.hpp"
+#include "alsutils/error/Exception.hpp"
 
 namespace alsuq {
 namespace stats {
 StatisticsHelper::StatisticsHelper(const StatisticsParameters& parameters)
 
     : samples(parameters.getNumberOfSamples()),
-      mpiConfig(parameters.getMpiConfiguration()) {
+      mpiConfig(parameters.getMpiConfiguration()),
+      exchangeCacheFactory(parameters.getExchangeCacheFactory()) {
 
 }
 
@@ -90,6 +92,58 @@ void StatisticsHelper::writeStatistics(const alsfvm::grid::Grid& grid) {
     }
 }
 
+void StatisticsHelper::write(const alsfvm::volume::Volume& conservedVariables,
+    const alsfvm::volume::Volume& extraVariables, const alsfvm::grid::Grid& grid,
+    const alsfvm::simulator::TimestepInformation& timestepInformation) {
+
+    Statistics::write(conservedVariables, extraVariables, grid,
+        timestepInformation);
+
+    const size_t numberOfGhostCells = getNumberOfGhostCells();
+
+    if (numberOfGhostCells > conservedVariables.getNumberOfXCells()) {
+        if (!exchangeCache) {
+            exchangeCache = exchangeCacheFactory->makeExchangeCache(grid);
+        }
+
+        const int timestep = int(timestepInformation.getNumberOfStepsPerformed());
+
+        for (size_t side = 0; side < 6; ++side) {
+            if (exchangeCache->hasSide(side)) {
+
+                exchangeCache->startExchange(conservedVariables, extraVariables,
+                    numberOfGhostCells, side, timestep
+                );
+
+                auto output = exchangeCache->getBorder(side, timestep);
+
+                this->computeStatisticsBorder(conservedVariables, extraVariables,
+                    *output.getConservedVolume(),
+                    *output.getExtraVolume(),
+                    grid, timestepInformation, side);
+
+            }
+        }
+    }
+}
+
+size_t StatisticsHelper::getNumberOfGhostCells() const {
+    return 0;
+}
+
+size_t StatisticsHelper::computeStatisticsBorder(const alsfvm::volume::Volume&
+    conservedVariablesInner, const alsfvm::volume::Volume&,
+    const alsfvm::volume::Volume&,
+    const alsfvm::volume::Volume&,
+    const alsfvm::grid::Grid&,
+    const alsfvm::simulator::TimestepInformation&,
+    const size_t) {
+    THROW("Calling not implemented computeStatisticsBorder, current state is\n"
+        << "\tthis->getNumberOfGhostCells() = " << getNumberOfGhostCells() << "\n,"
+        << "\tconservedVariablesInner.getNumberOfGhostCells() = " <<
+        conservedVariablesInner.getNumberOfGhostCells() << "\n");
+}
+
 StatisticsSnapshot& StatisticsHelper::findOrCreateSnapshot(
     const std::string& name,
     const alsfvm::simulator::TimestepInformation& timestepInformation,
@@ -145,10 +199,7 @@ StatisticsSnapshot& StatisticsHelper::findOrCreateSnapshot(
     }
 }
 
-alsfvm::volume::VolumePair StatisticsHelper::getBorder(ivec3 sideIdentifcation,
-    int ghostSize) {
 
-}
 
 }
 }

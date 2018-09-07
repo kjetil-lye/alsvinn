@@ -19,6 +19,8 @@
 #include <boost/property_tree/ptree.hpp>
 #include "alsuq/mpi/Configuration.hpp"
 #include "alsfvm/mpi/CellExchanger.hpp"
+#include "alsuq/mpi/ExchangeCacheFactory.hpp"
+
 namespace alsuq {
 namespace stats {
 
@@ -35,9 +37,10 @@ public:
     void setPlatform(const std::string& platform);
     std::string getPlatform() const;
 
-    alsfvm::mpi::CellExchangerPtr getCellExhanger() const;
 
-    void setCellExchanger(alsfvm::mpi::CellExchangerPtr cellExchanger) const;
+    alsuq::mpi::ExchangeCacheFactoryPtr getExchangeCacheFactory() const;
+    void setExchangeCacheFactory(const alsuq::mpi::ExchangeCacheFactoryPtr& value);
+
 private:
 
     size_t samples =  0;
@@ -46,6 +49,7 @@ private:
 
     std::string platform = "cpu";
 
-    alsfvm::mpi::CellExchangerPtr cellExchanger = nullptr;
+    alsuq::mpi::ExchangeCacheFactoryPtr exchangeCacheFactory = nullptr;
+};
 } // namespace stats
 } // namespace alsuq

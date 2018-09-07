@@ -43,9 +43,29 @@ public:
     //! Writes the statistics to file
     virtual void writeStatistics(const alsfvm::grid::Grid& grid) override;
 
+    virtual void write(const alsfvm::volume::Volume& conservedVariables,
+        const alsfvm::volume::Volume& extraVariables,
+        const alsfvm::grid::Grid& grid,
+        const alsfvm::simulator::TimestepInformation& timestepInformation) override;
+
 
 
 protected:
+    //! The number of ghost cells the statistics needs. If the number returned
+    //! is bigger than the ghost cells used for the simulation, the function
+    //! computeStatisticsBorder will be called
+    virtual size_t getNumberOfGhostCells() const;
+
+    virtual size_t computeStatisticsBorder(const alsfvm::volume::Volume&
+        conservedVariablesInner,
+        const alsfvm::volume::Volume& extraVariablesInner,
+        const alsfvm::volume::Volume& conservedVariablesBorder,
+        const alsfvm::volume::Volume& extraVariablesBorder,
+        const alsfvm::grid::Grid& grid,
+        const alsfvm::simulator::TimestepInformation& timestepInformation,
+        const size_t side);
+
+
     std::map<real, std::map<std::string, StatisticsSnapshot> > snapshots;
 
     //! Utility function.
@@ -68,15 +88,6 @@ protected:
         const alsfvm::volume::Volume& conservedVariables,
         const alsfvm::volume::Volume& extraVariables,
         size_t nx, size_t ny, size_t nz, const std::string& platform = "default");
-
-    //! Gets the data on the border, if any.
-    //!
-    //! @note returns an empty volume if the border is not present (ie. if this node is at the end)
-    //!
-    //! @note This is not the most efficient way of doing this,
-    //!       but since we anyway don't expect the statistics to be called too often,
-    //!       it should be ok.
-    alsfvm::volume::VolumePair getBorder(ivec3 sideIdentifcation, int ghostSize);
 private:
     size_t samples;
 
@@ -84,6 +95,9 @@ private:
     writers;
 
     alsuq::mpi::ConfigurationPtr mpiConfig;
+
+    alsuq::mpi::ExchangeCachePtr exchangeCache;
+    alsuq::mpi::ExchangeCacheFactoryPtr exchangeCacheFactory;
 };
 } // namespace stats
 } // namespace alsuq

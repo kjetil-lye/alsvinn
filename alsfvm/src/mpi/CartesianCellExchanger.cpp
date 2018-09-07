@@ -25,8 +25,10 @@ namespace alsfvm {
 namespace mpi {
 
 CartesianCellExchanger::CartesianCellExchanger(ConfigurationPtr& configuration,
-    const ivec6& neighbours)
-    : configuration(configuration), neighbours(neighbours) {
+    const ivec6& neighbours,
+    const std::array<int, 8>& cornerNeighbours)
+    : configuration(configuration), neighbours(neighbours),
+      cornerNeighbours(cornerNeighbours) {
 
 }
 
@@ -59,7 +61,7 @@ RequestContainer CartesianCellExchanger::exchangeCells(volume::Volume&
 
     RequestContainer container;
 
-    for (int side = 0; side < 2 * dimensions; ++side) {
+    for (size_t side = 0; side < 2 * dimensions; ++side) {
 
 
         for (size_t var = 0; var < inputVolume.getNumberOfVariables(); ++ var) {

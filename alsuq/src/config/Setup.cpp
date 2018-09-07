@@ -95,7 +95,7 @@ std::shared_ptr<run::Runner> Setup::makeRunner(const std::string& inputFilename,
             samplesForProc,
             statisticalConfiguration, name);
     auto statistics  = createStatistics(configuration, statisticalConfiguration,
-            spatialConfiguration, mpiConfigurationWorld);
+            spatialConfiguration, mpiConfigurationWorld, multiSpatial);
     runner->setStatistics(statistics);
 
     // We want to make sure everything is created before going further
@@ -183,7 +183,7 @@ std::vector<std::shared_ptr<stats::Statistics> > Setup::createStatistics(
     Setup::ptree& configuration,
     mpi::ConfigurationPtr statisticalConfiguration,
     mpi::ConfigurationPtr spatialConfiguration,
-    mpi::ConfigurationPtr worldConfiguration) {
+    mpi::ConfigurationPtr worldConfiguration, ivec3 multiSpatial) {
     auto statisticsNodes = configuration.get_child("uq.stats");
     stats::StatisticsFactory statisticsFactory;
     std::shared_ptr<alsfvm::io::WriterFactory> writerFactory;
@@ -197,12 +197,16 @@ std::vector<std::shared_ptr<stats::Statistics> > Setup::createStatistics(
     auto platform = configuration.get<std::string>("fvm.platform");
     std::vector<std::shared_ptr<stats::Statistics> > statisticsVector;
 
+    auto exchangeCacheFactory = std::make_shared<mpi::ExchangeCacheFactory>
+        (spatialConfiguration, multiSpatial.x, multiSpatial.y, multiSpatial.z);
+
     for (auto& statisticsNode : statisticsNodes) {
         auto name = statisticsNode.second.get<std::string>("name");
         boost::trim(name);
         stats::StatisticsParameters parameters(statisticsNode.second);
         parameters.setMpiConfiguration(statisticalConfiguration);
         parameters.setNumberOfSamples(readNumberOfSamples(configuration));
+        parameters.setExchangeCacheFactory(exchangeCacheFactory);
         parameters.setPlatform(platform);
         auto statistics = statisticsFactory.makeStatistics(platform, name, parameters);
 

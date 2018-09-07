@@ -53,7 +53,7 @@ private:
         ptree& configuration,
         alsutils::mpi::ConfigurationPtr statisticalConfiguration,
         mpi::ConfigurationPtr spatialConfiguration,
-        mpi::ConfigurationPtr worldConfiguration);
+        mpi::ConfigurationPtr worldConfiguration, ivec3 multiSpatial);
     size_t readNumberOfSamples(ptree& configuration);
     size_t readSampleStart(ptree& configuration);
 };

@@ -48,14 +48,17 @@ std::string StatisticsParameters::getPlatform() const {
     return platform;
 }
 
-alsfvm::mpi::CellExchangerPtr StatisticsParameters::getCellExhanger() const {
-    return cellExchanger;
+alsuq::mpi::ExchangeCacheFactoryPtr StatisticsParameters::getExchangeCacheFactory()
+const {
+    return exchangeCacheFactory;
 }
 
-void StatisticsParameters::setCellExchanger(alsfvm::mpi::CellExchangerPtr
-    cellExchanger) const {
-    this->cellExchanger = cellExchanger;
+void StatisticsParameters::setExchangeCacheFactory(const
+    alsuq::mpi::ExchangeCacheFactoryPtr&
+    value) {
+    exchangeCacheFactory = value;
 }
+
 
 }
 }
