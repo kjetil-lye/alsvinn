@@ -54,6 +54,8 @@ public:
 
     bool hasSide(int side) const;
 
+    bool hasCorner(int corner) const;
+
     real max(real value) override;
 
     ivec6 getNeighbours() const override;
@@ -67,10 +69,16 @@ private:
     std::vector<MpiIndexTypePtr> datatypesReceive;
     std::vector<MpiIndexTypePtr> datatypesSend;
 
+    std::vector<MpiIndexTypePtr> datatypesReceiveCorners;
+    std::vector<MpiIndexTypePtr> datatypesSendCorners;
+
     void createDataTypes(const volume::Volume& volume,
         const volume::Volume& inputVolume);
     void createDataTypeSend(int side, const volume::Volume& volume);
     void createDataTypeReceive(int side, const volume::Volume& volume);
+
+    void createDataTypeSendCorner(int corner, const volume::Volume& volume);
+    void createDataTypeReceiveCorner(int corner, const volume::Volume& volume);
 };
 } // namespace mpi
 } // namespace alsfvm

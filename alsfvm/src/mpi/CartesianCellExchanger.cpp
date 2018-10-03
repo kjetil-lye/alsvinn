@@ -37,6 +37,10 @@ bool CartesianCellExchanger::hasSide(int side) const {
     return neighbours[side] > -1;
 }
 
+bool CartesianCellExchanger::hasCorner(int corner) const {
+    return cornerNeighbours[corner] > -1;
+}
+
 real CartesianCellExchanger::max(real value) {
     real maximum;
     MPI_Allreduce(&value, &maximum, 1, MPI_DOUBLE,
@@ -61,15 +65,19 @@ RequestContainer CartesianCellExchanger::exchangeCells(volume::Volume&
 
     RequestContainer container;
 
+    const size_t numberOfSides = 2 * dimensions;
+    const size_t numberOfCorners = cornerNeighbours.size();
+    const size_t numberOfVariables = outputVolume.getNumberOfVariables();
+
     for (size_t side = 0; side < 2 * dimensions; ++side) {
 
 
         for (size_t var = 0; var < inputVolume.getNumberOfVariables(); ++ var) {
-            auto opposite_side = [](int s) {
+            auto oppositeSide = [](int s) {
                 int d = s / 2;
                 int i = s % 2;
 
-                return (i + 1) % 2 + d * 2;
+                return size_t((i + 1) % 2 + d * 2);
             };
 
 
@@ -85,13 +93,64 @@ RequestContainer CartesianCellExchanger::exchangeCells(volume::Volume&
             }
 
 
-            if (hasSide(opposite_side(side))) {
+            if (hasSide(oppositeSide(side))) {
 
                 container.addRequest(Request::ireceive(*outputVolume[var],
                         1,
-                        datatypesReceive[opposite_side(side)]->indexedDatatype(),
-                        neighbours[opposite_side(side)],
+                        datatypesReceive[oppositeSide(side)]->indexedDatatype(),
+                        neighbours[oppositeSide(side)],
                         side + var * 6,
+                        *configuration
+                    ));
+            }
+
+
+        }
+
+    }
+
+
+    for (int corner = 0; corner < numberOfCorners; ++corner) {
+
+
+        for (size_t var = 0; var < inputVolume.getNumberOfVariables(); ++ var) {
+            auto oppositeCorner = [&](int corner) {
+                // Recall: Corner is = 4*z + 2*y + z
+                const int x = corner % 2;
+                const int y = (corner / 2) % 2;
+                const int z = corner / 4;
+
+                const int newX = (x + 1) % 2;
+                const int newY = dimensions > 1 ? (y + 1) % 2 : 0;
+                const int newZ = dimensions > 2 ? (z + 1) % 2 : 0;
+
+                return 4 * newZ + 2 * newY + newX;
+            };
+
+
+            if (hasCorner(corner)) {
+
+                const int tag = numberOfSides * numberOfVariables + corner + var *
+                    numberOfCorners;
+                container.addRequest(Request::isend(*inputVolume[var],
+                        1,
+                        datatypesSendCorners[corner]->indexedDatatype(),
+                        cornerNeighbours[corner],
+                        tag,
+                        *configuration
+                    ));
+            }
+
+
+            if (hasCorner(oppositeCorner(corner))) {
+
+                const int tag = numberOfSides * numberOfVariables + corner + var *
+                    numberOfCorners;
+                container.addRequest(Request::ireceive(*outputVolume[var],
+                        1,
+                        datatypesReceiveCorners[oppositeCorner(corner)]->indexedDatatype(),
+                        cornerNeighbours[oppositeCorner(corner)],
+                        tag,
                         *configuration
                     ));
             }
@@ -155,6 +214,77 @@ void CartesianCellExchanger::createDataTypeReceive(int side,
             MPI_DOUBLE));
 }
 
+
+void CartesianCellExchanger::createDataTypeSendCorner(int corner,
+    const volume::Volume& volume) {
+
+    const size_t dimensions = volume.getDimensions();
+
+    for (size_t d = 0; d < dimensions; ++d) {
+        if (volume.getNumberOfGhostCells()[d] != volume.getNumberOfGhostCells()[0]) {
+            THROW("In order to do the corner exchange, we require that all"
+                << " dimensions use the same number of ghost cells. "
+                << "\n\nGiven ghostCells = " << volume.getNumberOfGhostCells());
+        }
+    }
+
+    const int ghostCells = volume.getNumberOfGhostCells()[0];
+
+    const auto numberOfCellsPerDirection = volume.getSize();
+
+
+    const int numberOfSegments = cartesian::computeNumberOfSegments(corner,
+            dimensions, numberOfCellsPerDirection);
+    std::vector<int> displacements = cartesian::computeDisplacements(corner,
+            dimensions,
+            numberOfCellsPerDirection,
+            ghostCells,
+            ghostCells);
+    std::vector<int> lengths = cartesian::computeLengths(corner, dimensions,
+            numberOfCellsPerDirection,
+            ghostCells);
+
+
+    datatypesSend.push_back(MpiIndexType::makeInstance(numberOfSegments, lengths,
+            displacements,
+            MPI_DOUBLE));
+}
+
+void CartesianCellExchanger::createDataTypeReceiveCorner(int corner,
+    const volume::Volume& volume) {
+
+    const size_t dimensions = volume.getDimensions();
+
+    for (size_t d = 0; d < dimensions; ++d) {
+        if (volume.getNumberOfGhostCells()[d] != volume.getNumberOfGhostCells()[0]) {
+            THROW("In order to do the corner exchange, we require that all"
+                << " dimensions use the same number of ghost cells. "
+                << "\n\nGiven ghostCells = " << volume.getNumberOfGhostCells());
+        }
+    }
+
+    const int ghostCells = volume.getNumberOfGhostCells().x;
+
+    const auto numberOfCellsPerDirection = volume.getSize();
+
+
+    const int numberOfSegments = cartesian::computeNumberOfSegments(corner,
+            dimensions, numberOfCellsPerDirection);
+    std::vector<int> displacements = cartesian::computeDisplacements(corner,
+            dimensions,
+            numberOfCellsPerDirection,
+            ghostCells,
+            0);
+    std::vector<int> lengths = cartesian::computeLengths(corner, dimensions,
+            numberOfCellsPerDirection,
+            ghostCells);
+
+
+    datatypesReceive.push_back(MpiIndexType::makeInstance(numberOfSegments, lengths,
+            displacements,
+            MPI_DOUBLE));
+}
+
 void CartesianCellExchanger::createDataTypes(const volume::Volume&
     outputVolume,
     const volume::Volume& inputVolume) {
@@ -165,8 +295,20 @@ void CartesianCellExchanger::createDataTypes(const volume::Volume&
         createDataTypeReceive(side, outputVolume);
     }
 
+    int numberOfCorners = 4 * (dimensions - 1);
+
+
+    for (int corner = 0; corner < numberOfCorners; ++corner) {
+        if (hasCorner(corner)) {
+            createDataTypeSendCorner(corner, inputVolume);
+            createDataTypeReceiveCorner(corner, outputVolume);
+        } else {
+            datatypesReceiveCorners.push_back(MpiIndexTypePtr());
+            datatypesSendCorners.push_back(MpiIndexTypePtr());
+        }
+    }
+}
+}
 
 }
 
-}
-}

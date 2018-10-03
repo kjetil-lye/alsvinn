@@ -16,6 +16,7 @@
 #include "alsfvm/mpi/CudaCartesianCellExchanger.hpp"
 #include "alsutils/mpi/safe_call.hpp"
 #include "alsfvm/cuda/cuda_utils.hpp"
+#include "alsfvm/mpi/cartesian/rank_component.hpp"
 namespace alsfvm {
 namespace mpi {
 
@@ -87,59 +88,127 @@ RequestContainer CudaCartesianCellExchanger::exchangeCells(
     const int dimensions = inputVolume.getDimensions();
 
     if (buffers.size() == 0) {
-        makeBuffers(inputVolume);
+        makeBuffers(inputVolume, outputVolume);
         makeStreams(inputVolume);
 
         receiveRequests.resize(inputVolume.getNumberOfVariables());
         sendRequests.resize(inputVolume.getNumberOfVariables());
 
+        receiveRequestsCorners.resize(inputVolume.getNumberOfVariables());
+        sendRequestsCorners.resize(inputVolume.getNumberOfVariables());
+
         for (int var = 0; var < inputVolume.getNumberOfVariables(); ++var) {
             receiveRequests[var].resize(2 * dimensions);
             sendRequests[var].resize(2 * dimensions);
+
+            receiveRequestsCorners[var].resize(numberOfCorners);
+            sendRequestsCorners[var].resize(numberOfCorners);
         }
     }
 
-
-    extractSides(inputVolume);
-
-    auto oppositeSide = [&](int side) {
-        const int i = side % 2;
-        return (i + 1) % 2 + (side / 2) * 2;
-    };
-
-    RequestContainer container;
-
-
-    for (int var = 0; var < inputVolume.getNumberOfVariables(); ++var) {
-
-        for (int side = 0; side < 2 * dimensions; ++side) {
-            if (hasSide(side)) {
-                CUDA_SAFE_CALL(cudaStreamSynchronize(memoryStreams[var][side]));
-                sendRequests[var][side] = (Request::isend(cpuBuffersSend[var][side],
-                            cpuBuffersSend[var][side].size(),
-                            MPI_DOUBLE, neighbours[side],
-                            var * 6 + side,
-                            *configuration));
-            }
-
-            if (hasSide(oppositeSide(side))) {
-                receiveRequests[var][oppositeSide(side)] = Request::ireceive(
-                        cpuBuffersReceive[var][oppositeSide(side)],
-                        cpuBuffersReceive[var][oppositeSide(side)].size(),
-                        MPI_DOUBLE, neighbours[oppositeSide(side)],
-                        var * 6 + side,
-                        *configuration);
-            }
-        }
-    }
-
-
-    insertSides(outputVolume);
+    exchangeSides(outputVolume, inputVolume);
+    exchangeCorners(outputVolume, inputVolume);
 
     CUDA_SAFE_CALL(cudaDeviceSynchronize());
 
+
+
     RequestContainer emptyContainer;
     return emptyContainer;
+}
+
+
+void CudaCartesianCellExchanger::exchangeSides(volume::Volume& outputVolume,
+                                                const volume::Volume& inputVolume) {
+
+
+
+
+        extractSides(inputVolume);
+
+        auto oppositeSide = [&](int side) {
+            const int i = side % 2;
+            return (i + 1) % 2 + (side / 2) * 2;
+        };
+
+        RequestContainer container;
+
+        const auto dimensions = outputVolume.getDimensions();
+
+        for (int var = 0; var < inputVolume.getNumberOfVariables(); ++var) {
+
+            for (int side = 0; side < 2 * dimensions; ++side) {
+                if (hasSide(side)) {
+                    CUDA_SAFE_CALL(cudaStreamSynchronize(memoryStreams[var][side]));
+                    sendRequests[var][side] = (Request::isend(cpuBuffersSend[var][side],
+                                cpuBuffersSend[var][side].size(),
+                                MPI_DOUBLE, neighbours[side],
+                                var * 6 + side,
+                                *configuration));
+                }
+
+                if (hasSide(oppositeSide(side))) {
+                    receiveRequests[var][oppositeSide(side)] = Request::ireceive(
+                            cpuBuffersReceive[var][oppositeSide(side)],
+                            cpuBuffersReceive[var][oppositeSide(side)].size(),
+                            MPI_DOUBLE, neighbours[oppositeSide(side)],
+                            var * 6 + side,
+                            *configuration);
+                }
+            }
+        }
+
+
+        insertSides(outputVolume);
+
+}
+
+
+void CudaCartesianCellExchanger::exchangeCorners(volume::Volume& outputVolume,
+                                                const volume::Volume& inputVolume) {
+
+
+
+
+        extractCorners(inputVolume);
+
+        auto oppositeCorner= [&](int corner) {
+            const int i = side % 2;
+            return (i + 1) % 2 + (side / 2) * 2;
+        };
+
+        const auto numberOfVariables = inputVolume.getNumberOfVariables();
+
+        RequestContainer container;
+
+        const auto dimensions = outputVolume.getDimensions();
+
+        for (int var = 0; var < inputVolume.getNumberOfVariables(); ++var) {
+
+            for (int corner = 0; side < numberOfCorners; ++corner) {
+                if (hasCorner(corner)) {
+                    CUDA_SAFE_CALL(cudaStreamSynchronize(memoryStreamsCorners[var][corner]));
+                    sendRequestsCorners[var][corner] = (Request::isend(cpuBuffersSend[var][corner],
+                                cpuBuffersSend[var][side].size(),
+                                MPI_DOUBLE, neighbours[side],
+                                6*numberOfVariables + var*numberOfCorners + corner,
+                                *configuration));
+                }
+
+                if (hasSide(oppositeSide(side))) {
+                    receiveRequestsCorners[var][oppositeCorner(corner)] = Request::ireceive(
+                            cpuBuffersReceive[var][oppositeCorner(corner)],
+                            cpuBuffersReceive[var][oppositeCorner(corner)].size(),
+                            MPI_DOUBLE, neighbours[oppositeCorner(corner)],
+                            6*numberOfVariables + var*numberOfCorners + corner,
+                            *configuration);
+                }
+            }
+        }
+
+
+        insertSides(outputVolume);
+
 }
 
 int CudaCartesianCellExchanger::getNumberOfActiveSides() const {
@@ -168,7 +237,23 @@ void CudaCartesianCellExchanger::extractSide(const ivec3& start,
     const ivec3& end,
     int side,
     const volume::Volume& inputVolume) {
-    for (int var  = 0; var < inputVolume.getNumberOfVariables(); ++var) {
+    for (int var = 0; var < inputVolume.getNumberOfVariables(); ++var) {
+        extractMemory(start, end, *inputVolume.getScalarMemoryArea(var),
+                      memoryStreams[side][var],
+                      cpuBuffersSend[side][var],
+                      *buffers[side][var]
+                      );
+    }
+
+}
+
+void CudaCartesianCellExchanger::extractMemory(const ivec3& start, const ivec3& end,
+        const memory::Memory<real>& inputMemory,
+        cudaStream_t stream,
+                                             thrust::host_vector<real>& cpuBuffer,
+                                             memory::Memory<real>& buffer) {
+
+
         const auto diff = end - start;
         const int size = diff.x * diff.y * diff.z;
 
@@ -180,20 +265,18 @@ void CudaCartesianCellExchanger::extractSide(const ivec3& start,
 
         extractSideDevice <<< (size + numberOfThreads - 1) / numberOfThreads,
                           numberOfThreads,
-                          0, memoryStreams[var][side] >>> (buffers[var][side]->getView(),
-                              inputVolume.getScalarMemoryArea(var)->getView(),
+                          0, stream >>> (buffer.getView(),
+                              inputMemory.getView(),
                               start,
                               end);
 
 
-        CUDA_SAFE_CALL(cudaMemcpyAsync(cpuBuffersSend[var][side].data(),
-                buffers[var][side]->getPointer(),
-                buffers[var][side]->getSize()*sizeof(real),
+        CUDA_SAFE_CALL(cudaMemcpyAsync(cpuBuffer.data(),
+                buffer.getPointer(),
+                buffer.getSize()*sizeof(real),
                 cudaMemcpyDeviceToHost,
-                memoryStreams[var][side]));
+                stream));
 
-
-    }
 
 
 }
@@ -250,6 +333,38 @@ void CudaCartesianCellExchanger::extractSides(const volume::Volume&
 
 }
 
+void CudaCartesianCellExchanger::extractCorners(const volume::Volume& inputVolume) {
+
+    const auto size = inputVolume.getInnerSize();
+    const auto gc = inputVolume.getNumberOfGhostCells();
+
+    for (int corner = 0; corner < numberOfCorners; ++corner) {
+        if (hasCorner(corner)) {
+
+            const auto position = cartesian::getCoordinates(corner, 2);
+
+            ivec3 start = {0,0,0};
+            for (int i = 0; i < 3; ++i) {
+                if (position[i] > 0) {
+                    start[i] = size[i] + gc[i];
+                }
+            }
+
+            const auto end = start + gc;
+            for (int var = 0; var < inputVolume.getNumberOfVariables(); ++var) {
+                extractMemory(start, end, *inputVolume.getScalarMemoryArea(var),
+                              memoryStreamsCorners[corner][var],
+                              cpuBuffersSendCorners[corner][var],
+                              *buffersCorners[corner][var]
+                              );
+            }
+        }
+    }
+}
+
+bool CudaCartesianCellExchanger::hasCorner(int corner) const {
+    return cornerNeighbours[corner] > -1;
+}
 
 void CudaCartesianCellExchanger::insertSide(const ivec3& start,
     const ivec3& end,
@@ -268,23 +383,83 @@ void CudaCartesianCellExchanger::insertSide(const ivec3& start,
 
         //sendRequests[var][side]->wait();
         receiveRequests[var][side]->wait();
-        CUDA_SAFE_CALL(cudaMemcpyAsync(buffers[var][side]->getPointer(),
-                cpuBuffersReceive[var][side].data(),
-                buffers[var][side]->getSize()*sizeof(real),
+
+        insertMemory(start, end, *outputVolume.getScalarMemoryArea(var),
+                     memoryStreams[var][side],
+                     cpuBuffersReceive[var][side],
+                     *buffers[var][side]);
+
+    }
+}
+
+void CudaCartesianCellExchanger::insertMemory(const ivec3& start,
+    const ivec3& end,
+    memory::Memory& outputMemory,
+    cudaStream_t stream,
+    thrust::host_vector<real>& cpuBuffer,
+    memory::Memory<real>& buffer) {
+
+
+
+        const auto diff = end - start;
+        const int size = diff.x * diff.y * diff.z;
+
+        if (size == 0) {
+            return;
+        }
+
+
+        //sendRequests[var][side]->wait();
+        receiveRequests[var][side]->wait();
+        CUDA_SAFE_CALL(cudaMemcpyAsync(buffer.getPointer(),
+                cpuBuffer.data(),
+                buffers.getSize()*sizeof(real),
                 cudaMemcpyHostToDevice,
-                memoryStreams[var][side]));
+                stream));
 
         const int numberOfThreads = 512;
         insertSideDevice <<< (size + numberOfThreads - 1) / numberOfThreads,
                          numberOfThreads,
-                         0, memoryStreams[var][side] >>> (
-                             outputVolume.getScalarMemoryArea(var)->getView(),
-                             buffers[var][side]->getView(),
+                         0, stream >>> (
+                             outputMemory.getView(),
+                             buffer.getView(),
                              start,
                              end);
 
+
+}
+
+
+void CudaCartesianCellExchanger::insertCorners(volume::Volume& outputVolume) {
+    const auto size = inputVolume.getInnerSize();
+    const auto gc = inputVolume.getNumberOfGhostCells();
+
+    for (int corner = 0; corner < numberOfCorners; ++corner) {
+        if (hasCorner(corner)) {
+
+            const auto position = cartesian::getCoordinates(corner, 2);
+
+            ivec3 start = {0,0,0};
+            for (int i = 0; i < 3; ++i) {
+                if (position[i] > 0) {
+                    start[i] = size[i] + gc[i];
+                }
+            }
+
+            const auto end = start + gc;
+            for (int var = 0; var < inputVolume.getNumberOfVariables(); ++var) {
+
+                receiveRequestsCorner[var][side]->wait();
+                insertMemory(start, end, *outputVolume.getScalarMemoryArea(var),
+                              memoryStreamsCorners[corner][var],
+                              cpuBuffersReceiveCorners[corner][var],
+                              *buffersCorners[corner][var]
+                              );
+            }
+        }
     }
 }
+
 
 
 void CudaCartesianCellExchanger::insertSides( volume::Volume& outputVolume) {
@@ -341,13 +516,25 @@ void CudaCartesianCellExchanger::makeStreams(const volume::Volume&
 
         for (int side = 0; side < 2 * dimensions; ++side) {
             CUDA_SAFE_CALL(cudaStreamCreate(&memoryStreams[var][side]));
-            //memoryStreams[var][side]=0;
+        }
+
+        for (int corner = 0; corner < numberOfCorners; ++corner) {
+            CUDA_SAFE_CALL(cudaStreamCreate(&memoryStreams[var][corner]));
         }
     }
 }
 
 void CudaCartesianCellExchanger::makeBuffers(const volume::Volume&
-    inputVolume) {
+    inputVolume,
+    const volume::Volume& outputVolume) {
+
+    makeBuffersSides(inputVolume, outputVolume);
+    makeBuffersCorners(inputVolume, outputVolume);
+}
+
+void CudaCartesianCellExchanger::makeBuffersSides(const volume::Volume& inputVolume,
+                                                    const volume::Volume& outputVolume) {
+
     buffers.resize(inputVolume.getNumberOfVariables());
     cpuBuffersSend.resize(buffers.size());
     cpuBuffersReceive.resize(buffers.size());
@@ -383,5 +570,44 @@ void CudaCartesianCellExchanger::makeBuffers(const volume::Volume&
         }
     }
 }
+
+void CudaCartesianCellExchanger::makeBuffersCorners(const volume::Volume& inputVolume,
+                                                    const volume::Volume& outputVolume) {
+
+    buffersCorners.resize(inputVolume.getNumberOfVariables());
+    cpuBuffersSendCorners.resize(buffers.size());
+    cpuBuffersReceiveCorners.resize(buffers.size());
+
+    const auto ghostCells = outputVolume.getNumberOfGhostCells();
+    for (int var = 0; var < inputVolume.getNumberOfVariables(); ++var) {
+        buffersCorners[var].resize(6);
+        cpuBuffersSendCorners[var].resize(6);
+        cpuBuffersReceiveCorners[var].resize(6);
+
+        for (int corner = 0; corner < numberOfCorners; ++corner) {
+            if (hasCorner(corner)) {
+                const auto position = cartesian::getCoordinates(corner, ivec3{2,2,2});
+
+
+
+                const int nx = ghostCells.x;
+                const int ny = std::max(ghostCells.y, 1);
+                const int nz = std::max(ghostCells.z, 1);
+
+
+
+                buffersCorners[var][corner] = alsfvm::make_shared<alsfvm::cuda::CudaMemory<real>>(nx, ny,
+                        nz);
+
+                cpuBuffersSendCorners[var][corner].resize(nx * ny * nz, 0);
+                cpuBuffersReceiveCorners[var][corner].resize(nx * ny * nz, 0);
+                //alsfvm::make_shared<alsfvm::memory::HostMemory<real>>(nx, ny, nz);
+            }
+        }
+    }
+}
+
+
+
 }
 }
