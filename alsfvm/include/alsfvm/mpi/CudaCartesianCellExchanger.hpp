@@ -66,6 +66,9 @@ private:
     void exchangeSides(volume::Volume& outputVolume,
         const volume::Volume& inputVolume);
 
+    void exchangeCorners(volume::Volume& outputVolume,
+                        const volume::Volume& inputVolume);
+
     ConfigurationPtr configuration;
     ivec6 neighbours;
     const std::array<int, 8> cornerNeighbours;
@@ -111,7 +114,7 @@ private:
     void insertSides(volume::Volume& outputVolume);
     void insertMemory(const ivec3& start,
         const ivec3& end,
-        memory::Memory& outputMemory,
+        memory::Memory<real>& outputMemory,
         cudaStream_t stream,
         thrust::host_vector<real>& cpuBuffer,
         memory::Memory<real>& buffer);
