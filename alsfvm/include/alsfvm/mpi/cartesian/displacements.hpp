@@ -50,8 +50,8 @@ inline std::vector<int> computeDisplacements(int side, int dimensions,
     const int numberOfSegments = computeNumberOfSegments(side, dimensions,
             numberOfCellsPerDirection);
 
-    if (side % 2 ==
-        1) { // we should subtract the offset since we are on a "right side/top side/back side"
+    if (side % 2 == 1) {
+        // we should subtract the offset since we are on a "right side/top side/back side"
         baseOffset *= -1;
     }
 

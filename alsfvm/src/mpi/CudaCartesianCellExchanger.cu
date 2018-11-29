@@ -17,6 +17,9 @@
 #include "alsutils/mpi/safe_call.hpp"
 #include "alsfvm/cuda/cuda_utils.hpp"
 #include "alsfvm/mpi/cartesian/rank_component.hpp"
+#include "alsfvm/mpi/cartesian/opposite_corner.hpp"
+#include "alsfvm/mpi/cartesian/opposite_side.hpp"
+
 namespace alsfvm {
 namespace mpi {
 
@@ -126,11 +129,6 @@ void CudaCartesianCellExchanger::exchangeSides(volume::Volume& outputVolume,
 
         extractSides(inputVolume);
 
-        auto oppositeSide = [&](int side) {
-            const int i = side % 2;
-            return (i + 1) % 2 + (side / 2) * 2;
-        };
-
         RequestContainer container;
 
         const auto dimensions = outputVolume.getDimensions();
@@ -147,11 +145,11 @@ void CudaCartesianCellExchanger::exchangeSides(volume::Volume& outputVolume,
                                 *configuration));
                 }
 
-                if (hasSide(oppositeSide(side))) {
-                    receiveRequests[var][oppositeSide(side)] = Request::ireceive(
-                            cpuBuffersReceive[var][oppositeSide(side)],
-                            cpuBuffersReceive[var][oppositeSide(side)].size(),
-                            MPI_DOUBLE, neighbours[oppositeSide(side)],
+                if (hasSide(cartesian::oppositeSide(side))) {
+                    receiveRequests[var][cartesian::oppositeSide(side)] = Request::ireceive(
+                            cpuBuffersReceive[var][cartesian::oppositeSide(side)],
+                            cpuBuffersReceive[var][cartesian::oppositeSide(side)].size(),
+                            MPI_DOUBLE, neighbours[cartesian::oppositeSide(side)],
                             var * 6 + side,
                             *configuration);
                 }
@@ -172,14 +170,6 @@ void CudaCartesianCellExchanger::exchangeCorners(volume::Volume& outputVolume,
 
         extractCorners(inputVolume);
 
-        auto oppositeCorner= [&](int corner) {
-            // recall, corner is z*4 + y*2 + x;
-            const int i = corner % 2;
-            const int j = corner / 2;
-            const int k = corner / 4;
-
-            return (i`+j*2+k*4;
-        };
 
         const auto numberOfVariables = inputVolume.getNumberOfVariables();
 
@@ -199,11 +189,11 @@ void CudaCartesianCellExchanger::exchangeCorners(volume::Volume& outputVolume,
                                 *configuration));
                 }
 
-                if (hasCorner(oppositeCorner(corner))) {
-                    receiveRequestsCorners[var][oppositeCorner(corner)] = Request::ireceive(
-                            cpuBuffersReceive[var][oppositeCorner(corner)],
-                            cpuBuffersReceive[var][oppositeCorner(corner)].size(),
-                            MPI_DOUBLE, neighbours[oppositeCorner(corner)],
+                if (hasCorner(cartesian::oppositeCorner(dimensions, corner))) {
+                    receiveRequestsCorners[var][cartesian::oppositeCorner(dimensions, corner)] = Request::ireceive(
+                            cpuBuffersReceive[var][cartesian::oppositeCorner(dimensions, corner)],
+                            cpuBuffersReceive[var][cartesian::oppositeCorner(dimensions, corner)].size(),
+                            MPI_DOUBLE, neighbours[cartesian::oppositeCorner(dimensions, corner)],
                             6*numberOfVariables + var*numberOfCorners + corner,
                             *configuration);
                 }

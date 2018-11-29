@@ -38,11 +38,11 @@ CartesianCellExchanger::CartesianCellExchanger(ConfigurationPtr& configuration,
 
 bool CartesianCellExchanger::hasSide(int side) const {
 
-    return neighbours[side] > -1;
+    return neighbours[size_t(side)] > -1;
 }
 
 bool CartesianCellExchanger::hasCorner(int corner) const {
-    return cornerNeighbours[corner] > -1;
+    return cornerNeighbours[size_t(corner)] > -1;
 }
 
 real CartesianCellExchanger::max(real value) {
@@ -119,6 +119,8 @@ RequestContainer CartesianCellExchanger::exchangeCells(volume::Volume&
 
                 const int tag = numberOfSides * numberOfVariables + corner + var *
                     numberOfCorners;
+
+
                 container.addRequest(Request::isend(*inputVolume[var],
                         1,
                         datatypesSendCorners[corner]->indexedDatatype(),
@@ -133,6 +135,7 @@ RequestContainer CartesianCellExchanger::exchangeCells(volume::Volume&
 
                 const int tag = numberOfSides * numberOfVariables + corner + var *
                     numberOfCorners;
+
                 container.addRequest(Request::ireceive(*outputVolume[var],
                         1,
                         datatypesReceiveCorners[cartesian::oppositeCorner(dimensions,
@@ -218,10 +221,19 @@ void CartesianCellExchanger::createDataTypeSendCorner(int corner,
 
     const int ghostCells = volume.getNumberOfGhostCells()[0];
 
-    const int numberOfSegments = volume.getNumberOfGhostCells()[0];
+    const auto numberOfCellsPerDirection = volume.getSize();
+
+    const int numberOfSegments = cartesian::computeNumberOfSegmentsCorner(corner,
+            dimensions,
+            numberOfCellsPerDirection,
+            volume.getNumberOfGhostCells());
+
+
+
 
     std::vector<int> displacements = cartesian::computeDisplacementsCorner(corner,
             dimensions,
+            numberOfCellsPerDirection,
             ghostCells);
 
     std::vector<int> lengths = cartesian::computeLengthsCorner(corner, dimensions,
@@ -251,16 +263,17 @@ void CartesianCellExchanger::createDataTypeReceiveCorner(int corner,
     const auto numberOfCellsPerDirection = volume.getSize();
 
 
-    const int numberOfSegments = cartesian::computeNumberOfSegments(corner,
-            dimensions, numberOfCellsPerDirection);
-
-    std::vector<int> displacements = cartesian::computeDisplacements(corner,
+    const int numberOfSegments = cartesian::computeNumberOfSegmentsCorner(corner,
             dimensions,
             numberOfCellsPerDirection,
-            ghostCells,
-            0);
-    std::vector<int> lengths = cartesian::computeLengths(corner, dimensions,
+            volume.getNumberOfGhostCells());
+
+    std::vector<int> displacements = cartesian::computeDisplacementsCorner(corner,
+            dimensions,
             numberOfCellsPerDirection,
+            ghostCells);
+
+    std::vector<int> lengths = cartesian::computeLengthsCorner(corner, dimensions,
             ghostCells);
 
 
