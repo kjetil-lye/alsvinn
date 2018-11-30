@@ -292,9 +292,6 @@ void CartesianCellExchanger::createDataTypes(const volume::Volume&
         createDataTypeReceive(side, outputVolume);
     }
 
-    int numberOfCorners = 4 * (dimensions - 1);
-
-
     for (int corner = 0; corner < numberOfCorners; ++corner) {
         if (hasCorner(corner)) {
             createDataTypeSendCorner(corner, inputVolume);

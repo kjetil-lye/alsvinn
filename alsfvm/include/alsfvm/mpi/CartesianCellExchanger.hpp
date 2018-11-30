@@ -20,6 +20,7 @@
 #include "alsfvm/mpi/MpiIndexType.hpp"
 #include "alsfvm/mpi/Request.hpp"
 #include "alsfvm/mpi/RequestContainer.hpp"
+#include "alsfvm/mpi/domain/CartesianDecomposition.hpp"
 
 namespace alsfvm {
 namespace mpi {
@@ -27,7 +28,8 @@ namespace mpi {
 //! Does the cell exchange for a cartesian grid.
 class CartesianCellExchanger : public CellExchanger {
 public:
-
+    constexpr static int numberOfCorners =
+        domain::CartesianDecomposition::numberOfCorners;
     //! Constructs a new instance
     //!
     //! @param configuration a pointer to the current MPI configuration

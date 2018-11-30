@@ -503,9 +503,10 @@ void CudaCartesianCellExchanger::insertSides( volume::Volume& outputVolume) {
 void CudaCartesianCellExchanger::makeStreams(const volume::Volume&
     inputVolume) {
     memoryStreams.resize(inputVolume.getNumberOfVariables());
-
+    memoryStreamsCorners.resize(inputVolume.getNumberOfVariables());
     for (int var = 0; var < inputVolume.getNumberOfVariables(); ++var) {
         memoryStreams[var].resize(6);
+        memoryStreamsCorners[var].resize(numberOfCorners);
         int dimensions = inputVolume.getDimensions();
 
         for (int side = 0; side < 2 * dimensions; ++side) {
@@ -513,7 +514,7 @@ void CudaCartesianCellExchanger::makeStreams(const volume::Volume&
         }
 
         for (int corner = 0; corner < numberOfCorners; ++corner) {
-            CUDA_SAFE_CALL(cudaStreamCreate(&memoryStreams[var][corner]));
+            CUDA_SAFE_CALL(cudaStreamCreate(&memoryStreamsCorners[var][corner]));
         }
     }
 }
@@ -574,9 +575,9 @@ void CudaCartesianCellExchanger::makeBuffersCorners(const volume::Volume& inputV
 
     const auto ghostCells = outputVolume.getNumberOfGhostCells();
     for (int var = 0; var < inputVolume.getNumberOfVariables(); ++var) {
-        buffersCorners[var].resize(6);
-        cpuBuffersSendCorners[var].resize(6);
-        cpuBuffersReceiveCorners[var].resize(6);
+        buffersCorners[var].resize(numberOfCorners);
+        cpuBuffersSendCorners[var].resize(numberOfCorners);
+        cpuBuffersReceiveCorners[var].resize(numberOfCorners);
 
         for (int corner = 0; corner < numberOfCorners; ++corner) {
             if (hasCorner(corner)) {
