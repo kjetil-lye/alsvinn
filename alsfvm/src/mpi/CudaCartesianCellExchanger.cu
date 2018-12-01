@@ -233,9 +233,9 @@ void CudaCartesianCellExchanger::extractSide(const ivec3& start,
     const volume::Volume& inputVolume) {
     for (int var = 0; var < inputVolume.getNumberOfVariables(); ++var) {
         extractMemory(start, end, *inputVolume.getScalarMemoryArea(var),
-                      memoryStreams[side][var],
-                      cpuBuffersSend[side][var],
-                      *buffers[side][var]
+                      memoryStreams[var][side],
+                      cpuBuffersSend[var][side],
+                      *buffers[var][side]
                       );
     }
 
@@ -347,9 +347,9 @@ void CudaCartesianCellExchanger::extractCorners(const volume::Volume& inputVolum
             const auto end = start + gc;
             for (int var = 0; var < inputVolume.getNumberOfVariables(); ++var) {
                 extractMemory(start, end, *inputVolume.getScalarMemoryArea(var),
-                              memoryStreamsCorners[corner][var],
-                              cpuBuffersSendCorners[corner][var],
-                              *buffersCorners[corner][var]
+                              memoryStreamsCorners[var][corner],
+                              cpuBuffersSendCorners[var][corner],
+                              *buffersCorners[var][corner]
                               );
             }
         }
