@@ -15,7 +15,8 @@
 
 #pragma once
 #include "alsfvm/volume/Volume.hpp"
-
+#include "alsfvm/types.hpp"
+#include <array>
 namespace alsfvm {
 namespace volume {
 

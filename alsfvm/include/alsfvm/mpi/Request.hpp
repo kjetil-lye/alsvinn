@@ -55,7 +55,7 @@ public:
     ~Request();
 private:
 
-    MPI_Request request{nullptr};
+    MPI_Request request{NULL};
 };
 
 typedef Request::RequestPtr RequestPtr;

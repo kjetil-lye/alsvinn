@@ -109,7 +109,7 @@ RequestContainer CartesianCellExchanger::exchangeCells(volume::Volume&
     }
 
 
-    for (int corner = 0; corner < numberOfCorners; ++corner) {
+    for (size_t corner = 0; corner < numberOfCorners; ++corner) {
 
 
         for (size_t var = 0; var < inputVolume.getNumberOfVariables(); ++ var) {
