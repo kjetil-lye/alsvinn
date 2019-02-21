@@ -149,7 +149,7 @@ RequestContainer CudaCartesianCellExchanger::exchangeCells(
                             *configuration));
 #else
                 sendRequests[var][side] = (Request::isend(*buffers[var][side],
-                            buffers[var][side].size(),
+                            buffers[var][side]->size(),
                             alsutils::mpi::MpiTypes<real>::MPI_Real, neighbours[side],
                             var * 6 + side,
                             *configuration));
