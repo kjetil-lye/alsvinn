@@ -54,12 +54,12 @@ SET(ALSVINN_USE_MPI ON CACHE BOOL "Build with MPI")
 SET(ALSVINN_CXX_FLAGS "" CACHE STRING "CXX flags to use")
 SET(ALSVINN_USE_TIMERS ON CACHE BOOL "Enable profiling timings (should not hurt performance)")
 SET(ALSVINN_USE_CUDA_TIMERS OFF CACHE BOOL "Enable CUDA profiling timings (hurts performance)")
-SET(ALSVINN_MPI_WRITE_TO_HOST_MEMORY ON CACHE BOOL "Enable writing directly to CPU memory for MPI transfer, could save time on some systems")
+#SET(ALSVINN_MPI_WRITE_TO_HOST_MEMORY ON CACHE BOOL "Enable writing directly to CPU memory for MPI transfer, could save time on some systems")
 
 
 SET(ALSVINN_BUILD_DOXYGEN ON CACHE BOOL "Build doxygen documentation")
 SET(ALSVINN_PROFILE OFF CACHE BOOL "Add profiling information")
-SET(ALSVINN_MPI_GPU_DIRECT OFF CACHE BOOL "Use NVidia's GPU direct to do MPI transfers (this is faster, but not only available)")
+SET(ALSVINN_MPI_GPU_DIRECT OFF CACHE BOOL "Use NVidia's GPU direct to do MPI transfers (this is faster, but not always available)")
 
 ADD_DEFINITIONS(-DMPICH_RDMA_ENABLED_CUDA=1)
 FIND_PACKAGE(OpenMP REQUIRED)

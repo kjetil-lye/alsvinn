@@ -59,14 +59,7 @@ private:
     ConfigurationPtr configuration;
     ivec6 neighbours;
 
-#ifndef ALSVINN_MPI_WRITE_TO_HOST_MEMORY
-    // for each variable, for each side
     std::vector<std::vector<alsfvm::shared_ptr<cuda::CudaMemory<real> > > > buffers;
-#else
-    std::vector<std::vector<thrust::host_vector<real> > > buffers;
-    std::vector<std::vector<alsfvm::memory::View<real> > > buffersViews;
-    std::vector<std::vector<alsfvm::memory::View<const real> > > buffersConstViews;
-#endif
 
     std::vector<std::vector<thrust::host_vector<real> > > cpuBuffersSend;
     std::vector<std::vector<thrust::host_vector<real> > > cpuBuffersReceive;
