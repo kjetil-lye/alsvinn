@@ -255,6 +255,12 @@ public:
     ///
     View<T> getView();
 
+    ///
+    /// \brief getView gets the view to the memory (const version)
+    /// \return the view
+    ///
+    View<const T> getConstView() const;
+
 
     ///
     /// \brief getView gets the view to the memory (const version)

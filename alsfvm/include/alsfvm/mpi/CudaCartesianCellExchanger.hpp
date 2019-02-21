@@ -3,12 +3,12 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -18,6 +18,7 @@
 #include "alsfvm/cuda/CudaMemory.hpp"
 #include "alsfvm/memory/HostMemory.hpp"
 #include <thrust/host_vector.h>
+#include "alsfvm/gpu_array.hpp"
 
 namespace alsfvm {
 namespace mpi {
@@ -65,15 +66,40 @@ private:
     void makeBuffers(const volume::Volume& inputVolume);
     void makeStreams(const volume::Volume& inputVolume);
 
-    void extractSides(const volume::Volume& inputVolume);
-    void extractSide(const ivec3& start, const ivec3& end,
-        int side,
-        const volume::Volume& inputvolume);
+    void callExtractSides(const volume::Volume& inputVolume);
 
+    template<int numberOfSides>
+    void callExtractSide(const
+        gpu_array<ivec3, numberOfSides>& start,
+        const gpu_array<ivec3, numberOfSides>& end,
+        const volume::Volume& inputvolume,
+        gpu_array<bool, numberOfSides> activeSides);
+
+    template<int numberOfSides>
+    void extractSides(const volume::Volume& inputVolume);
+
+    template<int numberOfSides, int numberOfVariables>
+    void extractSide(const gpu_array<ivec3, numberOfSides>& start,
+        const gpu_array<ivec3, numberOfSides>& end,
+        const volume::Volume& inputvolume,
+        gpu_array<bool, numberOfSides> activeSides);
+
+    void callInsertSides(volume::Volume& outputVolume);
+
+    template<int numberOfSides>
     void insertSides(volume::Volume& outputVolume);
-    void insertSide(const ivec3& start, const ivec3& end,
-        int side,
-        volume::Volume& outputVolume);
+
+    template<int numberOfSides>
+    void callInsertSide(const gpu_array<ivec3, numberOfSides>& start,
+        const gpu_array<ivec3, numberOfSides>& end,
+        volume::Volume& outputVolume,
+        gpu_array<bool, numberOfSides> activeSides);
+
+    template<int numberOfSides, int numberOfVariables>
+    void insertSide(const gpu_array<ivec3, numberOfSides>& start,
+        const gpu_array<ivec3, numberOfSides>& end,
+        volume::Volume& outputVolume,
+        gpu_array<bool, numberOfSides> activeSides);
 
 
     std::vector<std::vector<cudaStream_t> > memoryStreams;

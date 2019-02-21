@@ -17,19 +17,31 @@
 #include "alsutils/mpi/safe_call.hpp"
 #include "alsfvm/cuda/cuda_utils.hpp"
 #include "alsutils/mpi/mpi_types.hpp"
+#include "alsfvm/gpu_array.hpp"
 namespace alsfvm {
 namespace mpi {
 
 namespace {
 
-__global__ void extractSideDevice(memory::View<real> output,
-    memory::View<const real> input,
-    ivec3 start, ivec3 end) {
+template<int numberOfSides, int numberOfVariables>
+__global__ void extractSideDevice(
+    gpu_array<gpu_array<memory::View<real>, numberOfSides>, numberOfVariables> output,
+    gpu_array<memory::View<const real>, numberOfVariables> input,
+    gpu_array<ivec3, numberOfSides> starts,
+    gpu_array<ivec3, numberOfSides> ends,
+    gpu_array<bool, numberOfSides> activeSides) {
     const int index = threadIdx.x + blockIdx.x * blockDim.x;
 
-    const int nx = end.x - start.x;
-    const int ny = end.y - start.y;
-    const int nz = end.z - start.z;
+    const int side = blockIdx.y;
+
+    if (!activeSides[side]) {
+        return;
+    }
+    const int var = blockIdx.z;
+
+    const int nx = ends[side].x - starts[side].x;
+    const int ny = ends[side].y - starts[side].y;
+    const int nz = ends[side].z - starts[side].z;
 
     const int x = index % nx;
     const int y = (index / nx) % ny;
@@ -39,23 +51,35 @@ __global__ void extractSideDevice(memory::View<real> output,
         return;
     }
 
-    const int inputX = x + start.x;
-    const int inputY = y + start.y;
-    const int inputZ = z + start.z;
+    const int inputX = x + starts[side].x;
+    const int inputY = y + starts[side].y;
+    const int inputZ = z + starts[side].z;
 
-    output.at(x, y, z) = input.at(inputX, inputY, inputZ);
+    output[var][side].at(x, y, z) = input[var].at(inputX, inputY, inputZ);
 
 }
 
 
-__global__ void insertSideDevice(memory::View<real> output,
-    memory::View< real> input,
-    ivec3 start, ivec3 end) {
+template<int numberOfSides, int numberOfVariables>
+__global__ void insertSideDevice(gpu_array<memory::View<real>, numberOfVariables> output,
+                                 gpu_array<gpu_array<memory::View<const real>, numberOfSides>, numberOfVariables> input,
+                                 gpu_array<ivec3, numberOfSides> starts,
+                                 gpu_array<ivec3, numberOfSides> ends,
+                                 gpu_array<bool, numberOfSides> activeSides) {
     const int index = threadIdx.x + blockIdx.x * blockDim.x;
 
-    const int nx = end.x - start.x;
-    const int ny = end.y - start.y;
-    const int nz = end.z - start.z;
+
+    const int side = blockIdx.y;
+
+
+    if (!activeSides[side]) {
+        return;
+    }
+    const int var = blockIdx.z;
+
+    const int nx = ends[side].x - starts[side].x;
+    const int ny = ends[side].y - starts[side].y;
+    const int nz = ends[side].z - starts[side].z;
 
     const int x = index % nx;
     const int y = (index / nx) % ny;
@@ -65,12 +89,11 @@ __global__ void insertSideDevice(memory::View<real> output,
         return;
     }
 
-    const int outputX = x + start.x;
-    const int outputY = y + start.y;
-    const int outputZ = z + start.z;
+    const int outputX = x + starts[side].x;
+    const int outputY = y + starts[side].y;
+    const int outputZ = z + starts[side].z;
 
-    output.at(outputX, outputY, outputZ) = input.at(x, y, z);
-
+    output[var].at(outputX, outputY, outputZ) = input[var][side].at(x, y, z);
 }
 
 }
@@ -101,7 +124,7 @@ RequestContainer CudaCartesianCellExchanger::exchangeCells(
     }
 
 
-    extractSides(inputVolume);
+    callExtractSides(inputVolume);
 
     auto oppositeSide = [&](int s) {
         int d = s / 2;
@@ -137,7 +160,7 @@ RequestContainer CudaCartesianCellExchanger::exchangeCells(
     }
 
 
-    insertSides(outputVolume);
+    callInsertSides(outputVolume);
 
     CUDA_SAFE_CALL(cudaDeviceSynchronize());
 
@@ -167,36 +190,82 @@ bool CudaCartesianCellExchanger::hasSide(int side) const {
     return neighbours[side] != -1;
 }
 
-void CudaCartesianCellExchanger::extractSide(const ivec3& start,
-    const ivec3& end,
-    int side,
-    const volume::Volume& inputVolume) {
-    for (int var  = 0; var < inputVolume.getNumberOfVariables(); ++var) {
-        const auto diff = end - start;
+
+template<int numberOfSides, int numberOfVariables>
+void CudaCartesianCellExchanger::extractSide(const gpu_array<ivec3, numberOfSides>& start,
+    const gpu_array<ivec3, numberOfSides>& end,
+    const volume::Volume& inputVolume,
+     gpu_array<bool, numberOfSides> activeSides) {
+
+
+
+    gpu_array<gpu_array<memory::View<real>, numberOfSides>, numberOfVariables> output;
+    gpu_array<memory::View<const real>, numberOfVariables> input;
+
+
+
+
+    std::array<int, numberOfSides> sizes;
+    for (int side = 0; side < numberOfSides; ++side) {
+
+        const auto diff = end[side] - start[side];
         const int size = diff.x * diff.y * diff.z;
 
-        if (size <= 0) {
-            return;
-        }
-
-        const int numberOfThreads = 512;
-
-        extractSideDevice <<< (size + numberOfThreads - 1) / numberOfThreads,
-                          numberOfThreads,
-                          0, memoryStreams[var][side] >>> (buffers[var][side]->getView(),
-                              inputVolume.getScalarMemoryArea(var)->getView(),
-                              start,
-                              end);
-
-
-        CUDA_SAFE_CALL(cudaMemcpyAsync(cpuBuffersSend[var][side].data(),
-                buffers[var][side]->getPointer(),
-                buffers[var][side]->getSize()*sizeof(real),
-                cudaMemcpyDeviceToHost,
-                memoryStreams[var][side]));
+        sizes[side] = size;
 
 
     }
+
+    // sanity check
+    for(int side = 1; side < numberOfSides; ++side) {
+        if (sizes[side] != sizes[side-1]) {
+            THROW("We need every side to have the same number of elements for the exchange.");
+        }
+    }
+
+    if (sizes[0] == 0) {
+        return;
+    }
+
+
+    for (int var  = 0; var < inputVolume.getNumberOfVariables(); ++var) {
+        input[var] = inputVolume.getScalarMemoryArea(var)->getView();
+        for (int side = 0; side < numberOfSides; ++side) {
+            output[var][side] = buffers[var][side]->getView();
+        }
+    }
+
+
+
+
+    const int numberOfThreads = 512;
+
+
+    dim3 gridDim;
+    gridDim.x = (sizes[0] + numberOfThreads - 1) / numberOfThreads;
+    gridDim.y = numberOfSides;
+    gridDim.z = numberOfVariables;
+
+    extractSideDevice<numberOfSides, numberOfVariables> <<<gridDim,
+                      numberOfThreads,
+                      0, memoryStreams[0][0] >>> (output,
+                      input,
+                      start,
+                      end, activeSides);
+
+
+    for (int var  = 0; var < inputVolume.getNumberOfVariables(); ++var) {
+        for (int side = 0; side < numberOfSides; ++side) {
+             CUDA_SAFE_CALL(cudaMemcpyAsync(cpuBuffersSend[var][side].data(),
+                buffers[var][side]->getPointer(),
+                buffers[var][side]->getSize()*sizeof(real),
+                cudaMemcpyDeviceToHost,
+                memoryStreams[0][0]));
+        }
+    }
+
+
+
 
 
 }
@@ -204,6 +273,64 @@ void CudaCartesianCellExchanger::extractSide(const ivec3& start,
 ivec6 CudaCartesianCellExchanger::getNeighbours() const {
     return neighbours;
 }
+
+void CudaCartesianCellExchanger::callExtractSides(const volume::Volume&
+    inputVolume) {
+
+
+    const int dimensions = inputVolume.getDimensions();
+
+    switch(dimensions) {
+    case 1:
+        extractSides<2>(inputVolume);
+        break;
+    case 2:
+        extractSides<4>(inputVolume);
+        break;
+    case 3:
+        extractSides<6>(inputVolume);
+        break;
+    default:
+        THROW("Unexpected dimension " << dimensions);
+    }
+
+
+}
+
+template<int numberOfSides>
+void CudaCartesianCellExchanger::callExtractSide(const gpu_array<ivec3, numberOfSides>& start,
+                                                 const gpu_array<ivec3, numberOfSides>& end,
+                                                 const volume::Volume& inputvolume,
+                                                 gpu_array<bool, numberOfSides> activeSides) {
+
+    const auto numberOfVariables = inputvolume.getNumberOfVariables();
+    switch(numberOfVariables) {
+    case 1:
+        extractSide<numberOfSides, 1>(start, end, inputvolume, activeSides);
+        break;
+    case 2:
+        extractSide<numberOfSides, 2>(start, end, inputvolume, activeSides);
+        break;
+    case 3:
+        extractSide<numberOfSides, 3>(start, end, inputvolume, activeSides);
+        break;
+    case 4:
+        extractSide<numberOfSides, 4>(start, end, inputvolume, activeSides);
+        break;
+    case 5:
+        extractSide<numberOfSides, 5>(start, end, inputvolume, activeSides);
+        break;
+    case 6:
+        extractSide<numberOfSides, 6>(start, end, inputvolume, activeSides);
+        break;
+    default:
+        THROW("Unexpected number of variables " << numberOfVariables);
+    }
+
+
+}
+
+template<int numberOfSides>
 void CudaCartesianCellExchanger::extractSides(const volume::Volume&
     inputVolume) {
     const int nx = inputVolume.getTotalNumberOfXCells();
@@ -214,82 +341,193 @@ void CudaCartesianCellExchanger::extractSides(const volume::Volume&
     const int ngy = inputVolume.getNumberOfYGhostCells();
     const int ngz = inputVolume.getNumberOfZGhostCells();
 
+
     const int dimensions = inputVolume.getDimensions();
 
-    if (hasSide(0)) {
-        extractSide({ngx, 0, 0}, {2 * ngx, ny, nz}, 0, inputVolume);
+    gpu_array<ivec3, numberOfSides> starts;
+    gpu_array<ivec3, numberOfSides> ends;
+    gpu_array<bool, numberOfSides> activeSides;
+
+    for (size_t side = 0; side < numberOfSides; ++side) {
+        activeSides[side] = hasSide(side);
     }
 
-    if (hasSide(1)) {
+    starts[0] = {ngx, 0, 0};
+    ends[0] = {2 * ngx, ny, nz};
 
-        extractSide({nx - 2 * ngx, 0, 0}, {nx - ngx, ny, nz}, 1, inputVolume);
-    }
+
+    starts[1] = {nx-2*ngx, 0, 0};
+    ends[1] = {nx-ngx, ny, nz};
+
 
     if (dimensions > 1) {
 
-        if (hasSide(2)) {
 
-            extractSide({0, ngy, 0}, {nx, 2 * ngy, nz}, 2, inputVolume);
-        }
+        starts[2] = {0, ngy, 0};
+        ends[2] = {nx, 2 * ngy, nz};
 
-        if (hasSide(3)) {
+        starts[3] = {0, ny - 2* ngy, 0};
+        ends[3] = {nx, ny-ngy, nz};
 
-            extractSide({0, ny - 2 * ngy, 0}, {nx, ny - ngy, nz}, 3, inputVolume);
-        }
 
         if (dimensions > 2) {
-            if (hasSide(4)) {
 
-                extractSide({0, 0, ngz}, {nx, ny, 2 * ngz}, 4, inputVolume);
-            }
+            starts[4] = {0, 0, ngz};
+            ends[4] = {nx, ny, 2 * ngz};
 
-            if (hasSide(5)) {
 
-                extractSide({0, 0, nz - 2 * ngz}, {nx, ny, nz - ngz}, 5, inputVolume);
-            }
+
+            starts[5] = {0, 0, nz - 2 * ngz};
+            ends[5] = {nx, ny, nz - ngz};
+
         }
 
     }
 
+    callExtractSide<numberOfSides>(starts, ends, inputVolume, activeSides);
+
 }
 
 
-void CudaCartesianCellExchanger::insertSide(const ivec3& start,
-    const ivec3& end,
-    int side,
-    volume::Volume& outputVolume) {
-    for (int var  = 0; var < outputVolume.getNumberOfVariables(); ++var) {
+void CudaCartesianCellExchanger::callInsertSides(volume::Volume&
+    outputVolume) {
 
 
-        const auto diff = end - start;
+    const int dimensions = outputVolume.getDimensions();
+
+    switch(dimensions) {
+    case 1:
+        insertSides<2>(outputVolume);
+        break;
+    case 2:
+        insertSides<4>(outputVolume);
+        break;
+    case 3:
+        insertSides<6>(outputVolume);
+        break;
+    default:
+        THROW("Unexpected dimension " << dimensions);
+    }
+
+
+}
+
+template<int numberOfSides>
+void CudaCartesianCellExchanger::callInsertSide(const gpu_array<ivec3, numberOfSides>& start,
+                                                 const gpu_array<ivec3, numberOfSides>& end,
+                                                 volume::Volume& outputVolume,
+                                                 gpu_array<bool, numberOfSides> activeSides) {
+
+    const auto numberOfVariables = outputVolume.getNumberOfVariables();
+    switch(numberOfVariables) {
+    case 1:
+        insertSide<numberOfSides, 1>(start, end, outputVolume, activeSides);
+        break;
+    case 2:
+        insertSide<numberOfSides, 2>(start, end, outputVolume, activeSides);
+        break;
+    case 3:
+        insertSide<numberOfSides, 3>(start, end, outputVolume, activeSides);
+        break;
+    case 4:
+        insertSide<numberOfSides, 4>(start, end, outputVolume, activeSides);
+        break;
+    case 5:
+        insertSide<numberOfSides, 5>(start, end, outputVolume, activeSides);
+        break;
+    case 6:
+        insertSide<numberOfSides, 6>(start, end, outputVolume, activeSides);
+        break;
+    default:
+        THROW("Unexpected number of variables " << numberOfVariables);
+    }
+
+
+}
+
+
+template<int numberOfSides, int numberOfVariables>
+void CudaCartesianCellExchanger::insertSide(const gpu_array<ivec3, numberOfSides>& start,
+                                            const gpu_array<ivec3, numberOfSides>& end,
+                                            volume::Volume& outputVolume,
+                                            gpu_array<bool, numberOfSides> activeSides) {
+
+
+    gpu_array<gpu_array<memory::View<const real>, numberOfSides>, numberOfVariables> input;
+    gpu_array<memory::View<real>, numberOfVariables> output;
+
+
+
+
+    std::array<int, numberOfSides> sizes;
+    for (int side = 0; side < numberOfSides; ++side) {
+
+        const auto diff = end[side] - start[side];
         const int size = diff.x * diff.y * diff.z;
 
-        if (size == 0) {
-            return;
+        sizes[side] = size;
+
+
+    }
+
+    // sanity check
+    for(int side = 1; side < numberOfSides; ++side) {
+        if (sizes[side] != sizes[side-1]) {
+            THROW("We need every side to have the same number of elements for the exchange.");
         }
+    }
+
+    if (sizes[0] == 0) {
+        return;
+    }
 
 
-        //sendRequests[var][side]->wait();
-        receiveRequests[var][side]->wait();
-        CUDA_SAFE_CALL(cudaMemcpyAsync(buffers[var][side]->getPointer(),
+    for (int var  = 0; var < outputVolume.getNumberOfVariables(); ++var) {
+        output[var] = outputVolume.getScalarMemoryArea(var)->getView();
+        for (int side = 0; side < numberOfSides; ++side) {
+            input[var][side] = buffers[var][side]->getConstView();
+        }
+    }
+
+
+
+
+    for (int var  = 0; var < outputVolume.getNumberOfVariables(); ++var) {
+        for (int side = 0; side < numberOfSides; ++side) {
+            sendRequests[var][side]->wait();
+            receiveRequests[var][side]->wait();
+
+            CUDA_SAFE_CALL(cudaMemcpyAsync(buffers[var][side]->getPointer(),
                 cpuBuffersReceive[var][side].data(),
                 buffers[var][side]->getSize()*sizeof(real),
                 cudaMemcpyHostToDevice,
-                memoryStreams[var][side]));
-
-        const int numberOfThreads = 512;
-        insertSideDevice <<< (size + numberOfThreads - 1) / numberOfThreads,
-                         numberOfThreads,
-                         0, memoryStreams[var][side] >>> (
-                             outputVolume.getScalarMemoryArea(var)->getView(),
-                             buffers[var][side]->getView(),
-                             start,
-                             end);
-
+                memoryStreams[0][0]));
+        }
     }
+
+
+
+
+    const int numberOfThreads = 512;
+
+
+    dim3 gridDim;
+    gridDim.x = (sizes[0] + numberOfThreads - 1) / numberOfThreads;
+    gridDim.y = numberOfSides;
+    gridDim.z = numberOfVariables;
+
+    insertSideDevice<numberOfSides, numberOfVariables> <<< gridDim,
+                         numberOfThreads,
+                         0, memoryStreams[0][0] >>> (
+                             output,
+                             input,
+                             start,
+                             end, activeSides);
+
+
 }
 
-
+template<int numberOfSides>
 void CudaCartesianCellExchanger::insertSides( volume::Volume& outputVolume) {
     const int nx = outputVolume.getTotalNumberOfXCells();
     const int ny = outputVolume.getTotalNumberOfYCells();
@@ -302,34 +540,38 @@ void CudaCartesianCellExchanger::insertSides( volume::Volume& outputVolume) {
 
     const int dimensions = outputVolume.getDimensions();
 
-    if (hasSide(0)) {
-        insertSide({0, 0, 0}, {ngx, ny, nz}, 0, outputVolume);
+    gpu_array<ivec3, numberOfSides> starts;
+    gpu_array<ivec3, numberOfSides> ends;
+    gpu_array<bool, numberOfSides> activeSides;
+
+    for (size_t side = 0; side < numberOfSides; ++side) {
+        activeSides[side] = hasSide(side);
     }
 
-    if (hasSide(1)) {
-        insertSide({nx - ngx, 0, 0}, {nx, ny, nz}, 1, outputVolume);
-    }
+
+    starts[0] = {0, 0, 0};
+    ends[0] =  {ngx, ny, nz};
+
+    starts[1] = {nx - ngx, 0, 0};
+    ends[1] = {nx, ny, nz};
 
     if (dimensions > 1) {
 
-        if (hasSide(2)) {
-            insertSide({0, 0, 0}, {nx, ngy, nz}, 2, outputVolume);
-        }
+       starts[2] = {0, 0, 0};
+       ends[2] = {nx, ngy, nz};
 
-        if (hasSide(3)) {
-            insertSide({0, ny - ngy, 0}, {nx, ny, nz}, 3, outputVolume);
-        }
+       starts[3] = {0, ny - ngy, 0};
+       ends[3] = {nx, ny, nz};
+       if (dimensions > 2 ) {
+            starts[4] = {0, 0, 0};
+            ends[4] = {nx, ny, ngz};
 
-        if (dimensions > 2 ) {
-            if (hasSide(4)) {
-                insertSide({0, 0, 0}, {nx, ny, ngz}, 4, outputVolume);
-            }
-
-            if (hasSide(5)) {
-                insertSide({0, 0, nz - ngz}, {nx, ny, nz}, 5, outputVolume);
-            }
+            starts[5] = {0, 0, nz - ngz};
+            ends[5] = {nx, ny, nz};
         }
     }
+
+    callInsertSide<numberOfSides>(starts, ends, outputVolume, activeSides);
 
 }
 

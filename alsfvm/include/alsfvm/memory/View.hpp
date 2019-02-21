@@ -3,12 +3,12 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -29,6 +29,9 @@ namespace memory {
 template<class T>
 class View {
 public:
+
+
+
 
     ///
     /// \brief View constructs the View
@@ -51,6 +54,30 @@ public:
         : nx(nx), ny(ny), nz(nz), pointer(pointer), extentXInBytes(extentXInBytes),
           extentYInBytes(extentYInBytes) {
         // empty
+    }
+
+    __device__ __host__ View(const View<T>& other)
+        : View(other.pointer, other.nx, other.ny, other.nz, other.extentXInBytes,
+              other.extentYInBytes) {
+    }
+
+
+    __device__ __host__ View<T>& operator=(const View<T>& other) {
+        this->pointer = other.pointer;
+        this->nx = other.nx;
+        this->ny = other.ny;
+        this->nz = other.nz;
+
+        this->extentXInBytes = other.extentXInBytes;
+        this->extentYInBytes = other.extentYInBytes;
+
+        return *this;
+
+    }
+
+
+    __device__ __host__  View() : View(nullptr, 0, 0, 0, 0, 0) {
+
     }
 
     ///
@@ -126,9 +153,9 @@ public:
         return nz;
     }
 
-    const size_t nx;
-    const size_t ny;
-    const size_t nz;
+    size_t nx;
+    size_t ny;
+    size_t nz;
 private:
     T* pointer;
 
