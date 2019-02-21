@@ -231,7 +231,11 @@ void CudaCartesianCellExchanger::extractSide(const gpu_array<ivec3, numberOfSide
     for (int var  = 0; var < inputVolume.getNumberOfVariables(); ++var) {
         input[var] = inputVolume.getScalarMemoryArea(var)->getView();
         for (int side = 0; side < numberOfSides; ++side) {
+#ifdef ALSVINN_MPI_WRITE_TO_HOST_MEMORY
+            output[var][side] = buffersViews[var][side];
+#else
             output[var][side] = buffers[var][side]->getView();
+#endif
         }
     }
 
@@ -253,7 +257,7 @@ void CudaCartesianCellExchanger::extractSide(const gpu_array<ivec3, numberOfSide
                       start,
                       end, activeSides);
 
-
+#ifndef ALSVINN_MPI_WRITE_TO_HOST_MEMORY
     for (int var  = 0; var < inputVolume.getNumberOfVariables(); ++var) {
         for (int side = 0; side < numberOfSides; ++side) {
              CUDA_SAFE_CALL(cudaMemcpyAsync(cpuBuffersSend[var][side].data(),
@@ -263,7 +267,7 @@ void CudaCartesianCellExchanger::extractSide(const gpu_array<ivec3, numberOfSide
                 memoryStreams[0][0]));
         }
     }
-
+#endif
 
 
 
@@ -485,12 +489,16 @@ void CudaCartesianCellExchanger::insertSide(const gpu_array<ivec3, numberOfSides
     for (int var  = 0; var < outputVolume.getNumberOfVariables(); ++var) {
         output[var] = outputVolume.getScalarMemoryArea(var)->getView();
         for (int side = 0; side < numberOfSides; ++side) {
+#ifdef ALSVINN_MPI_WRITE_TO_HOST_MEMORY
+            input[var][side] = buffersConstViews[var][side];
+#else
             input[var][side] = buffers[var][side]->getConstView();
+#endif
         }
     }
 
 
-
+#ifndef ALSVINN_MPI_WRITE_TO_HOST_MEMORY
 
     for (int var  = 0; var < outputVolume.getNumberOfVariables(); ++var) {
         for (int side = 0; side < numberOfSides; ++side) {
@@ -504,7 +512,7 @@ void CudaCartesianCellExchanger::insertSide(const gpu_array<ivec3, numberOfSides
                 memoryStreams[0][0]));
         }
     }
-
+#endif
 
 
 
@@ -617,10 +625,15 @@ void CudaCartesianCellExchanger::makeBuffers(const volume::Volume&
                     ((side == 4) + (side == 5)) * inputVolume.getNumberOfZGhostCells();
 
 
-
+#ifndef ALSVINN_MPI_WRITE_TO_HOST_MEMORY
                 buffers[var][side] = alsfvm::make_shared<alsfvm::cuda::CudaMemory<real>>(nx, ny,
                         nz);
+#else
+                buffers[var][side].resize(nx*ny*nz, 0);
+                buffersViews[var][side] = alsfvm::memory::View<real>(buffers[var][side].data(), nx, ny, nz, nx*sizeof(real), ny*sizeof(real));
 
+                buffersConstViews[var][side] = alsfvm::memory::View<const real>(buffers[var][side].data(), nx, ny, nz, nx*sizeof(real), ny*sizeof(real));
+#endif
                 cpuBuffersSend[var][side].resize(nx * ny * nz, 0);
                 cpuBuffersReceive[var][side].resize(nx * ny * nz, 0);
                 //alsfvm::make_shared<alsfvm::memory::HostMemory<real>>(nx, ny, nz);

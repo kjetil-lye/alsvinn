@@ -18,7 +18,7 @@
 
 #cmakedefine ALSVINN_USE_TIMERS 1
 #cmakedefine ALSVINN_USE_CUDA_TIMERS 1
-
+#cmakedefine ALSVINN_MPI_WRITE_TO_HOST_MEMORY 1
 
 namespace alsutils {\
   std::string getAlsvinnVersion();
