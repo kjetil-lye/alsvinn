@@ -148,7 +148,7 @@ RequestContainer CudaCartesianCellExchanger::exchangeCells(
                             var * 6 + side,
                             *configuration));
 #else
-                sendRequests[var][side] = (Request::isend(buffers[var][side]->getPointer(),
+                sendRequests[var][side] = (Request::isend(*buffers[var][side],
                             buffers[var][side].size(),
                             alsutils::mpi::MpiTypes<real>::MPI_Real, neighbours[side],
                             var * 6 + side,
@@ -166,7 +166,7 @@ RequestContainer CudaCartesianCellExchanger::exchangeCells(
                         *configuration);
 #else
                 receiveRequests[var][oppositeSide(side)] = Request::ireceive(
-                        buffers[var][oppositeSide(side)]->getPointer(),
+                        *buffers[var][oppositeSide(side)],
                         buffers[var][oppositeSide(side)]->getSize(),
                         alsutils::mpi::MpiTypes<real>::MPI_Real, neighbours[oppositeSide(side)],
                         var * 6 + side,
