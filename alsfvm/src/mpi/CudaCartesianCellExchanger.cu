@@ -141,20 +141,37 @@ RequestContainer CudaCartesianCellExchanger::exchangeCells(
         for (int side = 0; side < 2 * dimensions; ++side) {
             if (hasSide(side)) {
                 CUDA_SAFE_CALL(cudaStreamSynchronize(memoryStreams[var][side]));
+#ifndef ALSVINN_MPI_WRITE_TO_HOST_MEMORY
                 sendRequests[var][side] = (Request::isend(cpuBuffersSend[var][side],
                             cpuBuffersSend[var][side].size(),
                             alsutils::mpi::MpiTypes<real>::MPI_Real, neighbours[side],
                             var * 6 + side,
                             *configuration));
+#else
+                sendRequests[var][side] = (Request::isend(buffers[var][side],
+                            buffers[var][side].size(),
+                            alsutils::mpi::MpiTypes<real>::MPI_Real, neighbours[side],
+                            var * 6 + side,
+                            *configuration));
+#endif
             }
 
             if (hasSide(oppositeSide(side))) {
+#ifndef ALSVINN_MPI_WRITE_TO_HOST_MEMORY
                 receiveRequests[var][oppositeSide(side)] = Request::ireceive(
                         cpuBuffersReceive[var][oppositeSide(side)],
                         cpuBuffersReceive[var][oppositeSide(side)].size(),
                         alsutils::mpi::MpiTypes<real>::MPI_Real, neighbours[oppositeSide(side)],
                         var * 6 + side,
                         *configuration);
+#else
+                receiveRequests[var][oppositeSide(side)] = Request::ireceive(
+                        buffers[var][oppositeSide(side)],
+                        buffers[var][oppositeSide(side)].size(),
+                        alsutils::mpi::MpiTypes<real>::MPI_Real, neighbours[oppositeSide(side)],
+                        var * 6 + side,
+                        *configuration);
+#endif
             }
         }
     }
