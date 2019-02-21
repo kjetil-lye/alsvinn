@@ -60,7 +60,7 @@ View<T> Memory<T>::getView() {
 }
 
 template<class T>
-View<T> Memory::getConstView() const {
+View<const T> Memory<T>::getConstView() const {
     return View<const T>(getPointer(), nx, ny, nz, getExtentXInBytes(),
             getExtentYInBytes());
 }
