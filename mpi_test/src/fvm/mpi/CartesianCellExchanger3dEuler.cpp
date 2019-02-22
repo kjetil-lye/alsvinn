@@ -33,7 +33,7 @@ TEST(CartesianCellExchanger3dEuler, Test3D) {
 
     const int N = 8;
 
-    if (numberOfProcessors < 8) {
+    if (numberOfProcessors < 16) {
         return;
     }
 
