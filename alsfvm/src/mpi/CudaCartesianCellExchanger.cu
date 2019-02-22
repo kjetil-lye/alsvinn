@@ -255,7 +255,7 @@ L
         input[var] = inputVolume.getScalarMemoryArea(var)->getView();
         for (int side = 0; side < numberOfSides; ++side) {
             if (hasSide(side)) {
-#ifndef AlsVINN_MPI_GPU_DIRECT
+#ifndef AlSVINN_MPI_GPU_DIRECT
                 output[var][side] = buffers[var][side]->getView();
 #else
                 output[var][side] = buffersSend[var][side]->getView();
@@ -649,7 +649,7 @@ void CudaCartesianCellExchanger::makeBuffers(const volume::Volume&
     cpuBuffersReceive.resize(buffers.size());
 #else
     buffersSend.resize(inputVolume.getNumberOfVariables());
-    buffersReceive.resize(buffers.size());
+    buffersReceive.resize(buffersSend.size());
 #endif
     for (int var = 0; var < inputVolume.getNumberOfVariables(); ++var) {
 #ifndef ALSVINN_MPI_GPU_DIRECT
