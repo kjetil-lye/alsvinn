@@ -20,6 +20,7 @@ TARGET_LINK_LIBRARIES(alsvinncli alsfvm
   ${CUDARTLIB}
   ${OpenMP_CXX_LIB_NAMES}
   Boost::program_options
+  ${CUDARTLIB}
   )
 
 
