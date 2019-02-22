@@ -248,7 +248,9 @@ void CudaCartesianCellExchanger::extractSide(const gpu_array<ivec3, numberOfSide
     for (int var  = 0; var < inputVolume.getNumberOfVariables(); ++var) {
         input[var] = inputVolume.getScalarMemoryArea(var)->getView();
         for (int side = 0; side < numberOfSides; ++side) {
-            output[var][side] = buffers[var][side]->getView();
+            if (hasSide(side)) {
+                output[var][side] = buffers[var][side]->getView();
+            }
         }
     }
 
@@ -273,11 +275,13 @@ void CudaCartesianCellExchanger::extractSide(const gpu_array<ivec3, numberOfSide
 #ifndef ALSVINN_MPI_GPU_DIRECT
     for (int var  = 0; var < inputVolume.getNumberOfVariables(); ++var) {
         for (int side = 0; side < numberOfSides; ++side) {
-             CUDA_SAFE_CALL(cudaMemcpyAsync(cpuBuffersSend[var][side].data(),
-                buffers[var][side]->getPointer(),
-                buffers[var][side]->getSize()*sizeof(real),
-                cudaMemcpyDeviceToHost,
-                memoryStreams[0][0]));
+            if (hasSide(side)) {
+                CUDA_SAFE_CALL(cudaMemcpyAsync(cpuBuffersSend[var][side].data(),
+                   buffers[var][side]->getPointer(),
+                   buffers[var][side]->getSize()*sizeof(real),
+                   cudaMemcpyDeviceToHost,
+                   memoryStreams[0][0]));
+            }
         }
     }
 #endif
@@ -503,7 +507,9 @@ void CudaCartesianCellExchanger::insertSide(const gpu_array<ivec3, numberOfSides
         output[var] = outputVolume.getScalarMemoryArea(var)->getView();
         for (int side = 0; side < numberOfSides; ++side) {
 
-            input[var][side] = buffers[var][side]->getConstView();
+            if (hasSide(side)) {
+                input[var][side] = buffers[var][side]->getConstView();
+            }
 
         }
     }
@@ -513,14 +519,16 @@ void CudaCartesianCellExchanger::insertSide(const gpu_array<ivec3, numberOfSides
 
     for (int var  = 0; var < outputVolume.getNumberOfVariables(); ++var) {
         for (int side = 0; side < numberOfSides; ++side) {
-            sendRequests[var][side]->wait();
-            receiveRequests[var][side]->wait();
+            if (hasSide(side)) {
+                sendRequests[var][side]->wait();
+                receiveRequests[var][side]->wait();
 
-            CUDA_SAFE_CALL(cudaMemcpyAsync(buffers[var][side]->getPointer(),
-                cpuBuffersReceive[var][side].data(),
-                buffers[var][side]->getSize()*sizeof(real),
-                cudaMemcpyHostToDevice,
-                memoryStreams[0][0]));
+                CUDA_SAFE_CALL(cudaMemcpyAsync(buffers[var][side]->getPointer(),
+                    cpuBuffersReceive[var][side].data(),
+                    buffers[var][side]->getSize()*sizeof(real),
+                    cudaMemcpyHostToDevice,
+                    memoryStreams[0][0]));
+            }
         }
     }
 #endif
