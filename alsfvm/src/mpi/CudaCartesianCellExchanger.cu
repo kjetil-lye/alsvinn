@@ -18,7 +18,6 @@
 #include "alsfvm/cuda/cuda_utils.hpp"
 #include "alsutils/mpi/mpi_types.hpp"
 #include "alsfvm/gpu_array.hpp"
-#define L std::cout << __LINE__ << __FILE__ << std::endl;
 namespace alsfvm {
 namespace mpi {
 
@@ -127,21 +126,21 @@ RequestContainer CudaCartesianCellExchanger::exchangeCells(
         }
     }
 
-L
+
     callExtractSides(inputVolume);
-L
+
     auto oppositeSide = [&](int s) {
         int d = s / 2;
         int i = s % 2;
 
         return (i + 1) % 2 + d * 2;
     };
-L
+
     RequestContainer container;
 
-L
+
     for (int var = 0; var < inputVolume.getNumberOfVariables(); ++var) {
-L
+
         for (int side = 0; side < 2 * dimensions; ++side) {
             if (hasSide(side)) {
                 CUDA_SAFE_CALL(cudaStreamSynchronize(memoryStreams[var][side]));
@@ -159,9 +158,9 @@ L
                             *configuration));
 #endif
             }
-L
+
             if (hasSide(oppositeSide(side))) {
-    L
+
 #ifndef ALSVINN_MPI_GPU_DIRECT
                 receiveRequests[var][oppositeSide(side)] = Request::ireceive(
                         cpuBuffersReceive[var][oppositeSide(side)],
@@ -177,14 +176,14 @@ L
                         var * 6 + side,
                         *configuration);
 #endif
-    L
+
             }
         }
     }
-L
+
 
     callInsertSides(outputVolume);
-L
+
     CUDA_SAFE_CALL(cudaDeviceSynchronize());
 
     RequestContainer emptyContainer;
@@ -225,7 +224,7 @@ void CudaCartesianCellExchanger::extractSide(const gpu_array<ivec3, numberOfSide
     gpu_array<gpu_array<memory::View<real>, numberOfSides>, numberOfVariables> output;
     gpu_array<memory::View<const real>, numberOfVariables> input;
 
-L
+
 
 
     std::array<int, numberOfSides> sizes;
@@ -238,7 +237,7 @@ L
 
 
     }
-L
+
     // sanity check
     for(int side = 1; side < numberOfSides; ++side) {
         if (sizes[side] != sizes[side-1]) {
@@ -250,7 +249,7 @@ L
         return;
     }
 
-L
+
     for (int var  = 0; var < inputVolume.getNumberOfVariables(); ++var) {
         input[var] = inputVolume.getScalarMemoryArea(var)->getView();
         for (int side = 0; side < numberOfSides; ++side) {
@@ -265,7 +264,7 @@ L
     }
 
 
-L
+
 
     const int numberOfThreads = 512;
 
@@ -281,7 +280,7 @@ L
                       input,
                       start,
                       end, activeSides);
-L
+
 #ifndef ALSVINN_MPI_GPU_DIRECT
     for (int var  = 0; var < inputVolume.getNumberOfVariables(); ++var) {
         for (int side = 0; side < numberOfSides; ++side) {
@@ -296,7 +295,7 @@ L
     }
 #endif
 
-L
+
 
 
 }
@@ -487,7 +486,7 @@ void CudaCartesianCellExchanger::insertSide(const gpu_array<ivec3, numberOfSides
     gpu_array<gpu_array<memory::View<const real>, numberOfSides>, numberOfVariables> input;
     gpu_array<memory::View<real>, numberOfVariables> output;
 
-L
+
 
 
     std::array<int, numberOfSides> sizes;
@@ -500,7 +499,7 @@ L
 
 
     }
-L
+
     // sanity check
     for(int side = 1; side < numberOfSides; ++side) {
         if (sizes[side] != sizes[side-1]) {
@@ -511,7 +510,7 @@ L
     if (sizes[0] == 0) {
         return;
     }
-L
+
 
     for (int var  = 0; var < outputVolume.getNumberOfVariables(); ++var) {
         output[var] = outputVolume.getScalarMemoryArea(var)->getView();
@@ -527,7 +526,7 @@ L
 
         }
     }
-L
+
 
 #ifndef ALSVINN_MPI_GPU_DIRECT
 
@@ -555,12 +554,12 @@ L
         }
     }
 #endif
-L
+
 
 
     const int numberOfThreads = 512;
 
-L
+
     dim3 gridDim;
     gridDim.x = (sizes[0] + numberOfThreads - 1) / numberOfThreads;
     gridDim.y = numberOfSides;
@@ -574,7 +573,7 @@ L
                              start,
                              end, activeSides);
 
-L
+
 }
 
 template<int numberOfSides>
