@@ -59,10 +59,18 @@ private:
     ConfigurationPtr configuration;
     ivec6 neighbours;
 
+#ifdef ALSVINN_MPI_GPU_DIRECT
+    std::vector<std::vector<alsfvm::shared_ptr<cuda::CudaMemory<real> > > >
+    buffersSend;
+    std::vector<std::vector<alsfvm::shared_ptr<cuda::CudaMemory<real> > > >
+    buffersReceive;
+
+#else
     std::vector<std::vector<alsfvm::shared_ptr<cuda::CudaMemory<real> > > > buffers;
 
     std::vector<std::vector<thrust::host_vector<real> > > cpuBuffersSend;
     std::vector<std::vector<thrust::host_vector<real> > > cpuBuffersReceive;
+#endif
     void makeBuffers(const volume::Volume& inputVolume);
     void makeStreams(const volume::Volume& inputVolume);
 
