@@ -47,7 +47,7 @@ TEST(CartesianCellExchanger3dEuler, Test3D) {
     const int ghostCells = 3;
 
 
-    int nz = numberOfProcessors / 4;
+    int nz = numberOfProcessors / 16;
     int ny = 4;
     int nx = 4;
 
