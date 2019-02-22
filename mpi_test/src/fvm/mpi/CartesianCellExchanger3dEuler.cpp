@@ -42,7 +42,7 @@ TEST(CartesianCellExchanger3dEuler, Test3D) {
     rvec3 upperCorner = {4, 4, 3};
 
     const std::string platform = "cpu";
-    const std::string equation = "euler";
+    const std::string equation = "euler3";
 
     const int ghostCells = 3;
 
