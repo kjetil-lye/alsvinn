@@ -110,8 +110,11 @@ RequestContainer CudaCartesianCellExchanger::exchangeCells(
     const volume::Volume& inputVolume) {
 
     const int dimensions = inputVolume.getDimensions();
-
+#ifdef ALSVINN_MPI_GPU_DIRECT
+    if (buffersSend.size() == 0) {
+#else
     if (buffers.size() == 0) {
+#endif
         makeBuffers(inputVolume);
         makeStreams(inputVolume);
 
