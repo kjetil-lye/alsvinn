@@ -149,8 +149,8 @@ L
                             var * 6 + side,
                             *configuration));
 #else
-                sendRequests[var][side] = (Request::isend(*buffers[var][side],
-                            buffers[var][side]->getSize(),
+                sendRequests[var][side] = (Request::isend(*buffersSend[var][side],
+                            buffersSend[var][side]->getSize(),
                             alsutils::mpi::MpiTypes<real>::MPI_Real, neighbours[side],
                             var * 6 + side,
                             *configuration));
@@ -168,8 +168,8 @@ L
                         *configuration);
 #else
                 receiveRequests[var][oppositeSide(side)] = Request::ireceive(
-                        *buffers[var][oppositeSide(side)],
-                        buffers[var][oppositeSide(side)]->getSize(),
+                        *buffersReceive[var][oppositeSide(side)],
+                        buffersReceive[var][oppositeSide(side)]->getSize(),
                         alsutils::mpi::MpiTypes<real>::MPI_Real, neighbours[oppositeSide(side)],
                         var * 6 + side,
                         *configuration);
@@ -252,7 +252,11 @@ L
         input[var] = inputVolume.getScalarMemoryArea(var)->getView();
         for (int side = 0; side < numberOfSides; ++side) {
             if (hasSide(side)) {
+#ifndef AlsVINN_MPI_GPU_DIRECT
                 output[var][side] = buffers[var][side]->getView();
+#else
+                output[var][side] = buffersSend[var][side]->getView();
+#endif
             }
         }
     }
@@ -511,7 +515,11 @@ L
         for (int side = 0; side < numberOfSides; ++side) {
 
             if (hasSide(side)) {
+#ifndef ALSVINN_MPI_GPU_DIRECT
                 input[var][side] = buffers[var][side]->getConstView();
+#else
+                input[var][side] = buffersReceive[var][side]->getConstView();
+#endif
             }
 
         }
@@ -531,6 +539,15 @@ L
                     buffers[var][side]->getSize()*sizeof(real),
                     cudaMemcpyHostToDevice,
                     memoryStreams[0][0]));
+            }
+        }
+    }
+#else
+    for (int var  = 0; var < outputVolume.getNumberOfVariables(); ++var) {
+        for (int side = 0; side < numberOfSides; ++side) {
+            if (hasSide(side)) {
+                sendRequests[var][side]->wait();
+                receiveRequests[var][side]->wait();
             }
         }
     }
@@ -623,14 +640,23 @@ void CudaCartesianCellExchanger::makeStreams(const volume::Volume&
 
 void CudaCartesianCellExchanger::makeBuffers(const volume::Volume&
     inputVolume) {
+#ifndef ALSVINN_MPI_GPU_DIRECT
     buffers.resize(inputVolume.getNumberOfVariables());
     cpuBuffersSend.resize(buffers.size());
     cpuBuffersReceive.resize(buffers.size());
-
+#else
+    buffersSend.resize(inputVolume.getNumberOfVariables());
+    buffersReceive.resize(buffers.size());
+#endif
     for (int var = 0; var < inputVolume.getNumberOfVariables(); ++var) {
+#ifndef ALSVINN_MPI_GPU_DIRECT
         buffers[var].resize(6);
         cpuBuffersSend[var].resize(6);
         cpuBuffersReceive[var].resize(6);
+#else
+        buffersSend[var].resize(inputVolume.getNumberOfVariables());
+        buffersReceive[var].resize(buffers.size());
+#endif
 
         for (int side = 0; side < 6; ++side) {
             if (hasSide(side)) {
@@ -645,12 +671,18 @@ void CudaCartesianCellExchanger::makeBuffers(const volume::Volume&
                 const int nz = (side != 4) * (side != 5) * inputVolume.getTotalNumberOfZCells()
                     +
                     ((side == 4) + (side == 5)) * inputVolume.getNumberOfZGhostCells();
-
+#ifndef ALSVINN_MPI_GPU_DIRECT
                 buffers[var][side] = alsfvm::make_shared<alsfvm::cuda::CudaMemory<real>>(nx, ny,
                         nz);
-#ifndef ALSVINN_MPI_GPU_DIRECT
+
                 cpuBuffersSend[var][side].resize(nx * ny * nz, 0);
                 cpuBuffersReceive[var][side].resize(nx * ny * nz, 0);
+#else
+                buffersSend[var][side] = alsfvm::make_shared<alsfvm::cuda::CudaMemory<real>>(nx, ny,
+                        nz);
+
+                buffersReceive[var][side] = alsfvm::make_shared<alsfvm::cuda::CudaMemory<real>>(nx, ny,
+                        nz);
 #endif
                 //alsfvm::make_shared<alsfvm::memory::HostMemory<real>>(nx, ny, nz);
             }
