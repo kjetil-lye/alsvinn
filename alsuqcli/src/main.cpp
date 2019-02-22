@@ -113,7 +113,7 @@ int main(int argc, char** argv) {
 #endif
 #endif
         alsutils::mpi::setCudaDevice();
-#ifdef ALSSVINN_USE_MPI
+#ifdef ALSVINN_USE_MPI
         MPI_Init(&argc, &argv);
 #ifdef ALSVINN_MPI_GPU_DIRECT
 
