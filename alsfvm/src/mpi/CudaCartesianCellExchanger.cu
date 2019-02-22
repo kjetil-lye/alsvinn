@@ -18,7 +18,8 @@
 #include "alsfvm/cuda/cuda_utils.hpp"
 #include "alsutils/mpi/mpi_types.hpp"
 #include "alsfvm/gpu_array.hpp"
-#define L std::cout << __LINE__ << __FILE__ << std::endl;
+#include "alsutils/log.hpp"
+#define L ALSVINN_LOG(INFO,  __LINE__ << __FILE__ << std::endl);
 namespace alsfvm {
 namespace mpi {
 
