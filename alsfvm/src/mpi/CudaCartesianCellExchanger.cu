@@ -145,7 +145,7 @@ L
 L
         for (int side = 0; side < 2 * dimensions; ++side) {
             if (hasSide(side)) {
-                CUDA_SAFE_CALL(cudaStreamSynchronize(memoryStreams[var][side]));
+                CUDA_SAFE_CALL(cudaStreamSynchronize(memoryStreams[0][0]));
 #ifndef ALSVINN_MPI_GPU_DIRECT
                 sendRequests[var][side] = (Request::isend(cpuBuffersSend[var][side],
                             cpuBuffersSend[var][side].size(),
