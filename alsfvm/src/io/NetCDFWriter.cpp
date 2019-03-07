@@ -21,6 +21,7 @@
 #include "alsfvm/io/netcdf_write_attributes.hpp"
 #include "alsutils/timer/Timer.hpp"
 #include "alsutils/log.hpp"
+#include "alsutils/config.hpp"
 namespace alsfvm {
 namespace io {
 
@@ -57,7 +58,9 @@ void NetCDFWriter::writeToFile(netcdf_raw_ptr file,
     const simulator::TimestepInformation& timestepInformation) {
     auto dimensions = createDimensions(file, conservedVariables);
     writeVolume(file, conservedVariables, dimensions);
+#ifdef ALSVINN_WRITE_EXTRA_VARIABLES
     writeVolume(file, extraVariables, dimensions);
+#endif
 
 }
 

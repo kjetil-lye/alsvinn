@@ -32,6 +32,8 @@
 #include "alsutils/log.hpp"
 #include "alsfvm/python/handle_pyerror.hpp"
 #include "alsutils/timer/Timer.hpp"
+#include "alsutils/config.hpp"
+
 #define L std::cout << __FILE__ << ":" << __LINE__ << std::endl;
 
 #define CHECK_PYTHON \

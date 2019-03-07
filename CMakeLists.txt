@@ -63,7 +63,7 @@ SET(ALSVINN_USE_CUDA_TIMERS OFF CACHE BOOL "Enable CUDA profiling timings (hurts
 
 SET(ALSVINN_PRINT_MEMORY_ALLOCATIONS OFF CACHE BOOL "Log every memory allocation")
 
-
+SET(ALSVINN_WRITE_EXTRA_VARIABLES ON CACHE BOOL "Write the extra (non conserved) variables to file")
 SET(ALSVINN_BUILD_DOXYGEN ON CACHE BOOL "Build doxygen documentation")
 SET(ALSVINN_PROFILE OFF CACHE BOOL "Add profiling information")
 SET(ALSVINN_MPI_GPU_DIRECT OFF CACHE BOOL "Use NVidia's GPU direct to do MPI transfers (this is faster, but not only available)")

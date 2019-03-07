@@ -29,6 +29,7 @@
 #include "alsfvm/diffusion/DiffusionOperator.hpp"
 #include <vector>
 #include <memory>
+#include "alsutils/config.hpp"
 
 #ifdef ALSVINN_USE_MPI
     #include "alsfvm/mpi/CellExchanger.hpp"
@@ -176,7 +177,9 @@ private:
     alsfvm::shared_ptr<integrator::Integrator> integrator;
     alsfvm::shared_ptr<boundary::Boundary> boundary;
     std::vector<alsfvm::shared_ptr<volume::Volume> > conservedVolumes;
+
     alsfvm::shared_ptr<volume::Volume> extraVolume;
+
     alsfvm::shared_ptr<equation::CellComputer> cellComputer;
 
     alsfvm::shared_ptr<alsfvm::diffusion::DiffusionOperator> diffusionOperator;

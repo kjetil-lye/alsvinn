@@ -3,12 +3,12 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -62,9 +62,17 @@ Simulator::Simulator(const SimulatorParameters& simulatorParameters,
                 system->getNumberOfGhostCells()));
     }
 
+#ifdef ALSVINN_WRITE_EXTRA_VARIABLES
     extraVolume = volumeFactory.createExtraVolume(nx, ny, nz,
             system->getNumberOfGhostCells());
+#else
 
+    if (platformName == "cpu") {
+        extraVolume = volumeFactory.createExtraVolume(nx, ny, nz,
+                system->getNumberOfGhostCells());
+    }
+
+#endif
 
 
 }
@@ -154,7 +162,9 @@ void Simulator::setInitialValue(alsfvm::shared_ptr<init::InitialData>&
             *primitiveVolume, *cellComputerCPU, *grid);
 
         conservedVolumeCPU->copyTo(*conservedVolumes[0]);
+#ifdef ALSVINN_WRITE_EXTRA_VARIABLES
         extraVolumeCPU->copyTo(*extraVolume);
+#endif
 
     } else {
         auto primitiveVolume = volumeFactory.createPrimitiveVolume(nx, ny, nz,
@@ -169,8 +179,9 @@ void Simulator::setInitialValue(alsfvm::shared_ptr<init::InitialData>&
 
 
 
-
+#ifdef ALSVINN_WRITE_EXTRA_VARIABLES
     cellComputer->computeExtraVariables(*conservedVolumes[0], *extraVolume);
+#endif
 }
 
 const std::shared_ptr<grid::Grid>& Simulator::getGrid() const {
@@ -191,8 +202,10 @@ void Simulator::callWriters() {
 }
 
 void Simulator::checkConstraints() {
+#ifdef ALSVINN_WRITE_EXTRA_VARIABLES
     const bool obeys = cellComputer->obeysConstraints(*conservedVolumes[0],
             *extraVolume);
+
 
     if (!obeys) {
         THROW("Simulation state does not obey constraints! "
@@ -200,6 +213,8 @@ void Simulator::checkConstraints() {
             << ", number of timesteps performed " <<
             timestepInformation.getNumberOfStepsPerformed());
     }
+
+#endif
 }
 
 void Simulator::incrementSolution() {
@@ -223,8 +238,9 @@ void Simulator::incrementSolution() {
     }
 
     conservedVolumes[0].swap(conservedVolumes.back());
-
+#ifdef ALSVINN_WRITE_EXTRA_VARIABLES
     cellComputer->computeExtraVariables(*conservedVolumes[0], *extraVolume);
+#endif
     timestepInformation.incrementTime(dt);
 }
 

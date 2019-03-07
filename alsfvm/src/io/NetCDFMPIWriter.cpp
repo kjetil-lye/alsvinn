@@ -21,7 +21,7 @@
 #include "alsfvm/io/parallel_netcdf_write_attributes.hpp"
 #include <boost/filesystem.hpp>
 #include "alsutils/timer/Timer.hpp"
-
+#include "alsutils/config.hpp"
 #include <fstream>
 
 namespace alsfvm {
@@ -174,7 +174,9 @@ void NetCDFMPIWriter::writeToFile(netcdf_raw_ptr file,
 
     NETCDF_SAFE_CALl(ncmpi_enddef(file));
     writeVolume(file, conservedVariables, dimensions, datasetsConserved, grid);
+#ifdef ALSVINN_WRITE_EXTRA_VARIABLES
     writeVolume(file, extraVariables, dimensions, datasetsExtra, grid);
+#endif
 
 }
 
