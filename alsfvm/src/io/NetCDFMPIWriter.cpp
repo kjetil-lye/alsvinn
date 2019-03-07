@@ -170,7 +170,9 @@ void NetCDFMPIWriter::writeToFile(netcdf_raw_ptr file,
 
 
     auto datasetsConserved = makeDataset(file, conservedVariables, dimensions);
+#ifdef ALSVINN_WRITE_EXTRA_VARIABLES
     auto datasetsExtra = makeDataset(file, extraVariables, dimensions);
+#endif
 
     NETCDF_SAFE_CALl(ncmpi_enddef(file));
     writeVolume(file, conservedVariables, dimensions, datasetsConserved, grid);
